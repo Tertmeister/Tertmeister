@@ -2,10 +2,12 @@ import json, subprocess, sys, math
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
-AUDIO, WORDS, OUT = sys.argv[1], sys.argv[2], sys.argv[3]
+AUDIO, WORDS, OUT, CFG = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+cfg = json.load(open(CFG))
 W, H, FPS = 1080, 1920, 30
 HW, HH = W // 2, H // 2
-DUR = 52.0
+_alen = float(subprocess.run(['ffprobe','-v','error','-show_entries','format=duration','-of','csv=p=0',AUDIO],capture_output=True,text=True).stdout)
+DUR = cfg.get('duration', round(_alen + 0.6, 2))
 NF = int(DUR * FPS)
 rng = np.random.default_rng(7)
 
@@ -20,7 +22,8 @@ env = np.clip(np.convolve(env, np.ones(4)/4, "same"), 0, 1.2)
 
 # ---------- words & chunks ----------
 words = [(s, e, t.strip()) for s, e, t in json.load(open(WORDS))]
-EMPH = {"DEAD.", "TEETH.", "11", "12.", "STOLEN.", "WEAPON.", "NOTHING", "GREW.", "NECROMANCER", "ASH", "KILLED", "QUEEN"}
+EMPH = {e.upper() for e in cfg["emphasis"]}
+LAST = words[-1][1]
 chunks, cur = [], []
 for w in words:
     cur.append(w)
@@ -36,9 +39,11 @@ for i, c in enumerate(chunks):
     spans.append((st, en, c))
 
 # ---------- scene tints (time, rgb) ----------
-KEYS = [(0, (40, 90, 85)), (5.8, (40, 90, 85)), (6.6, (95, 85, 35)), (17.8, (95, 70, 30)),
-        (18.6, (45, 45, 110)), (26.4, (45, 45, 110)), (27.2, (140, 55, 15)), (36.6, (140, 60, 15)),
-        (37.4, (130, 18, 30)), (DUR, (130, 18, 30))]
+KEYS = []
+for i, (st, c) in enumerate(cfg["scenes"]):  # [start_time, [r,g,b]], 0.8s crossfade into each
+    if i: KEYS.append((st - 0.4, KEYS[-1][1]))
+    KEYS.append((st + (0.4 if i else 0), tuple(c)))
+KEYS.append((DUR, KEYS[-1][1]))
 def tint(t):
     for (t0, c0), (t1, c1) in zip(KEYS, KEYS[1:]):
         if t0 <= t <= t1:
@@ -89,6 +94,7 @@ td = ImageDraw.Draw(title_layer)
 spaced(td, 150, "WHAT THE SONGS", title_font, (235, 205, 150, 235), 10)
 spaced(td, 200, "DON'T TELL YOU", title_font, (235, 205, 150, 235), 10)
 td.line([(W/2 - 120, 268), (W/2 + 120, 268)], fill=(200, 140, 70, 180), width=2)
+if cfg.get("episode"): spaced(td, 290, cfg["episode"].upper(), sub_font, (210, 120, 80, 220), 6)
 title_glow = title_layer.filter(ImageFilter.GaussianBlur(10))
 
 cache = {}
@@ -148,7 +154,7 @@ for f in range(NF):
     lum = (0.10 + 0.55 * fog * grad) * vig * (0.85 + 0.25 * e)
     frame = lum[..., None] * col[None, None, :] * 2.2
     # embers
-    fire = 1.6 if 27 <= t < 37.5 else 1.0
+    fire = 1.6 if any(a_ <= t < b_ for a_, b_ in cfg.get('fire', [])) else 1.0
     glowmap = np.zeros((HH, HW), np.float32)
     yspd = pv * pz * fire
     cy = (py - yspd * t) % (HH + 20) - 10
@@ -188,7 +194,7 @@ for f in range(NF):
     # progress bar
     d = ImageDraw.Draw(img)
     d.rectangle([80, 1760, W - 80, 1766], fill=(70, 58, 48))
-    d.rectangle([80, 1760, 80 + int((W - 160) * min(1, t / 50.9)), 1766], fill=(255, 180, 80, 220))
+    d.rectangle([80, 1760, 80 + int((W - 160) * min(1, t / LAST)), 1766], fill=(255, 180, 80, 220))
 
     ff.stdin.write(img.convert("RGB").tobytes())
     if f % 150 == 0: print(f"{f}/{NF}", flush=True)
