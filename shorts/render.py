@@ -51,6 +51,21 @@ def tint(t):
             return np.array(c0) * (1-k) + np.array(c1) * k
     return np.array(KEYS[-1][1])
 
+# ---------- background rotation (cfg "rotations": [[start_time, degrees], ...], 0.8 s eased) ----------
+def rotate_bg(im, t):
+    ang = 0.0
+    for ts, deg in cfg.get("rotations", []):
+        k = min(1.0, max(0.0, (t - ts) / 0.8)); k = k * k * (3 - 2 * k)
+        ang += deg * k
+    a = ang % 360
+    if a < 1e-3 or a > 360 - 1e-3: return im
+    if abs(a - 180) < 1e-3: return im.transpose(Image.ROTATE_180)
+    r = math.radians(a); c, s_ = abs(math.cos(r)), abs(math.sin(r))
+    sc = max((HW * c + HH * s_) / HW, (HW * s_ + HH * c) / HH)  # zoom so the rotated frame stays covered
+    big = im.resize((int(HW * sc) + 2, int(HH * sc) + 2), Image.BILINEAR).rotate(a, resample=Image.BILINEAR)
+    l = (big.width - HW) // 2; tp = (big.height - HH) // 2
+    return big.crop((l, tp, l + HW, tp + HH))
+
 # ---------- fog textures ----------
 def noise(h, w, scale):
     small = rng.random((h // scale + 2, w // scale + 2)).astype(np.float32)
@@ -169,7 +184,7 @@ for f in range(NF):
     # fade in/out
     fade = min(1, t / 0.4) * min(1, max(0, (DUR - t) / 0.9))
     frame = np.clip(frame * fade, 0, 1)
-    img = Image.fromarray((frame * 255).astype(np.uint8)).resize((W, H), Image.BILINEAR).convert("RGBA")
+    img = rotate_bg(Image.fromarray((frame * 255).astype(np.uint8)), t).resize((W, H), Image.BILINEAR).convert("RGBA")
 
     # title
     img.alpha_composite(title_glow); img.alpha_composite(title_layer)
