@@ -51,6 +51,17 @@ def tint(t):
             return np.array(c0) * (1-k) + np.array(c1) * k
     return np.array(KEYS[-1][1])
 
+# ---------- background brightness (cfg "brightness": [[time, factor], ...], eased between keys; default 1) ----------
+BKEYS = sorted(cfg.get("brightness", []))
+def bright(t):
+    if not BKEYS: return 1.0
+    if t <= BKEYS[0][0]: return BKEYS[0][1]
+    for (t0, b0), (t1, b1) in zip(BKEYS, BKEYS[1:]):
+        if t0 <= t <= t1:
+            k = (t - t0) / max(t1 - t0, 1e-6); k = k*k*(3-2*k)
+            return b0 * (1-k) + b1 * k
+    return BKEYS[-1][1]
+
 # ---------- background rotation (cfg "rotations": [[start_time, degrees], ...], 0.8 s eased) ----------
 def rotate_bg(im, t):
     ang = 0.0
@@ -183,7 +194,7 @@ for f in range(NF):
     frame += rng.normal(0, 0.008, (HH, HW, 1)).astype(np.float32)  # grain
     # fade in/out
     fade = min(1, t / 0.4) * min(1, max(0, (DUR - t) / 0.9))
-    frame = np.clip(frame * fade, 0, 1)
+    frame = np.clip(frame * fade * bright(t), 0, 1)
     img = rotate_bg(Image.fromarray((frame * 255).astype(np.uint8)), t).resize((W, H), Image.BILINEAR).convert("RGBA")
 
     # title

@@ -9,4 +9,5 @@ Each episode folder holds `short.mp4` (1080x1920, ready to upload), the script, 
 4. Render: `python3 render.py mix.wav words.json short.mp4 config.json`
 
 `config.json`: `episode` (subtitle under the series title), `emphasis` (words shown in red when spoken),
-`scenes` (list of `[start_seconds, [r,g,b]]` colour moods), `fire` (time ranges with extra embers), `rotations` (list of `[start_seconds, degrees]`: the background turns by that much over 0.8 s), optional `duration`.
+`scenes` (list of `[start_seconds, [r,g,b]]` colour moods), `fire` (time ranges with extra embers), `rotations` (list of `[start_seconds, degrees]`: the background turns by that much over 0.8 s),
+`brightness` (list of `[seconds, factor]` keyframes, eased between them; 1 = normal, 0.2 = near black, 1.6 = bloom), optional `duration`.
