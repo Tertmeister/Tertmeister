@@ -36,6 +36,8 @@ for i, c in enumerate(chunks):
     st = c[0][0]
     nxt = chunks[i+1][0][0] if i + 1 < len(chunks) else DUR
     en = min(nxt, c[-1][1] + 0.7)
+    if i + 1 == len(chunks) and cfg.get("hold_last"):
+        en = DUR  # keep the final words on screen until the video ends
     spans.append((st, en, c))
 
 # ---------- scene tints (time, rgb) ----------
