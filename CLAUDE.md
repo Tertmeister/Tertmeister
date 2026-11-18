@@ -18,4 +18,4 @@ Episodes live in `shorts/epNN-<slug>/`; the shared renderer and pipeline are des
 - Series title card "WHAT THE SONGS DON'T TELL YOU" plus "Ep. N · <Title>".
 - Narration style: short, punchy lines; dry, knowing tone; ends on a hook.
 - Default voice: Kokoro `am_michael`, speed 1.0 (until the user picks another).
-- Spellings: Azul, Ambershire, Nightingale's palace, Aquarion, the Great Oak, the Royal Archives, Lady Jane, the Black Witch, the Witch of Hope.
+- Spellings: Azul, Ambershire, Nightingale's palace, Aquarion, the Great Oak, the Royal Archives, Lady Jane, the Black Witch, the Witch of Hope, the Paladins of Parabellum, the Adventurers' Guild.
