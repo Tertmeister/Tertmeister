@@ -1,0 +1,23 @@
+Ep. 6 · The Bifrost — third-party material used in the film
+
+FONTS (SIL Open Font License 1.1; licence texts in fonts/LICENSE-*.txt; files from the Fontsource npm packages)
+- Alfa Slab One — Copyright 2016 The Alfa Slab One Project Authors. Headlines.
+- Bagel Fat One — Copyright The Bagel Fat One Project Authors. Names, numerals, speech bubble.
+- Archivo Black — Copyright The Archivo Black Project Authors. Caption bar, stamps, HUD chip.
+- JetBrains Mono (ExtraBold) — Copyright The JetBrains Mono Project Authors. Case numbers, report text, labels.
+
+VOICE
+- Narration synthesized with Kokoro-82M (hexgrad, Apache License 2.0), voice "am_michael", speed 1.0,
+  via the kokoro Python package. Script: script.txt.
+- Speech-to-text check and word timings: faster-whisper with the Whisper "small" model (MIT License).
+
+MUSIC AND SOUND
+- Score, foley and ambience are synthesized in mix.py (numpy/scipy); no samples or recordings are used.
+- Mixing helpers from the Lemo-Opuscar library's core/audio/sfx.py (MIT License).
+
+PICTURE
+- Everything on screen is drawn in code in index.html. Rendering, mastering and subtitle tools from the
+  Lemo-Opuscar library's core/render (MIT License); some page helpers (halftone, caption bar, stamp,
+  dot wipe, paper and grain) are adapted from its Halftone Dossier demo code (MIT License).
+
+The story, names and lore belong to the series author.

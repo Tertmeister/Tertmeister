@@ -21,3 +21,9 @@ Each episode folder holds `short.mp4` (1080x1920, ready to upload), the script, 
 - `brightness`: list of `[seconds, factor]` keyframes, eased; 1 = normal, 0.2 = near black, 1.5 = bloom, 0 = black.
 - `hold_last`: keep the final caption on screen until the video ends.
 - `duration`: optional fixed length in seconds (default: audio length + 0.6 s).
+
+## Episodes made with Lemo-Opuscar
+Ep. 6 (`ep06-the-bifrost/`) is built with the Lemo-Opuscar plugin's **Halftone Dossier** style instead of
+`render.py`: everything is drawn in code in its `index.html`, scored in `mix.py`, and `build.sh` rebuilds the
+whole film (needs the library at `~/lemo-opuscar` with its core packages, and ffmpeg 7+). Its `TREATMENT.md`
+has the shot list, beat sheet and cue map; `CREDITS` lists the fonts and tools.

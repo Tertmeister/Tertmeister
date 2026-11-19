@@ -1,0 +1,165 @@
+{
+ "dur": 64.3,
+ "lines": [
+  {
+   "i": 0,
+   "t0": 0.55,
+   "t1": 3.5,
+   "text": "The thieves' guild keeps its own roads.",
+   "src": [
+    0.0,
+    2.95
+   ]
+  },
+  {
+   "i": 1,
+   "t0": 4.1,
+   "t1": 5.875,
+   "text": "Underground.",
+   "src": [
+    3.55,
+    5.325
+   ]
+  },
+  {
+   "i": 2,
+   "t0": 6.475,
+   "t1": 8.05,
+   "text": "Unmapped.",
+   "src": [
+    5.575,
+    7.15
+   ]
+  },
+  {
+   "i": 3,
+   "t0": 8.65,
+   "t1": 10.875,
+   "text": "They call it the Bifrost.",
+   "src": [
+    7.5,
+    9.725
+   ]
+  },
+  {
+   "i": 4,
+   "t0": 11.675,
+   "t1": 16.1,
+   "text": "Every road in the Bifrost hides a wall that isn't a wall.",
+   "src": [
+    10.525,
+    14.95
+   ]
+  },
+  {
+   "i": 5,
+   "t0": 16.7,
+   "t1": 21.05,
+   "text": "Behind each one, a sanctuary known only to thieves.",
+   "src": [
+    15.45,
+    19.8
+   ]
+  },
+  {
+   "i": 6,
+   "t0": 21.95,
+   "t1": 29.0,
+   "text": "Cicada, the spy network of the Paladins of Parabellum, has spent years trying to get inside.",
+   "src": [
+    20.7,
+    27.75
+   ]
+  },
+  {
+   "i": 7,
+   "t0": 29.7,
+   "t1": 33.6,
+   "text": "Only one infiltration has ever been reported.",
+   "src": [
+    28.45,
+    32.35
+   ]
+  },
+  {
+   "i": 8,
+   "t0": 34.2,
+   "t1": 35.925,
+   "text": "Agent Kat.",
+   "src": [
+    32.85,
+    34.575
+   ]
+  },
+  {
+   "i": 9,
+   "t0": 36.825,
+   "t1": 40.225,
+   "text": "Agent Kat's report describes something odd.",
+   "src": [
+    35.475,
+    38.875
+   ]
+  },
+  {
+   "i": 10,
+   "t0": 40.825,
+   "t1": 43.65,
+   "text": "At every station: a challenge.",
+   "src": [
+    39.475,
+    42.3
+   ]
+  },
+  {
+   "i": 11,
+   "t0": 44.25,
+   "t1": 46.175,
+   "text": "And a password.",
+   "src": [
+    42.65,
+    44.575
+   ]
+  },
+  {
+   "i": 12,
+   "t0": 46.975,
+   "t1": 51.125,
+   "text": "Captured thieves insist it's just extra security.",
+   "src": [
+    45.375,
+    49.525
+   ]
+  },
+  {
+   "i": 13,
+   "t0": 51.725,
+   "t1": 54.1,
+   "text": "Cicada isn't convinced.",
+   "src": [
+    50.125,
+    52.5
+   ]
+  },
+  {
+   "i": 14,
+   "t0": 55.0,
+   "t1": 57.825,
+   "text": "If only thieves know the way in...",
+   "src": [
+    53.4,
+    56.225
+   ]
+  },
+  {
+   "i": 15,
+   "t0": 58.425,
+   "t1": 60.825,
+   "text": "who is the password for?",
+   "src": [
+    56.725,
+    59.125
+   ]
+  }
+ ]
+}

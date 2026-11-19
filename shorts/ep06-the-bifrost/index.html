@@ -1,0 +1,921 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Bifrost</title>
+<style>
+  @font-face { font-family: 'Alfa Slab One'; src: url('fonts/alfa-slab-one-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-display: block; }
+  @font-face { font-family: 'Bagel Fat One'; src: url('fonts/bagel-fat-one-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-display: block; }
+  @font-face { font-family: 'Archivo Black'; src: url('fonts/archivo-black-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-display: block; }
+  @font-face { font-family: 'JetBrains Mono'; src: url('fonts/jetbrains-mono-latin-800-normal.woff2') format('woff2'); font-weight: 800; font-display: block; }
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: #EAD9B4; }
+  svg, canvas { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+  #paper { mix-blend-mode: multiply; pointer-events: none; }
+  #fx { pointer-events: none; }
+  .mul { mix-blend-mode: multiply; }
+</style>
+</head>
+<body>
+<svg id="stage" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="boil" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence id="boilT" type="fractalNoise" baseFrequency="0.022" numOctaves="2" seed="1" result="w"/>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="5" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="2" seed="4" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -22 15.2" result="gm"/>
+      <feComposite in="d" in2="gm" operator="in"/>
+    </filter>
+    <filter id="stampInk" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" seed="11" result="w"/>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="7" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="3" seed="21" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -9 5.9" result="gm"/>
+      <feComposite in="d" in2="gm" operator="in"/>
+    </filter>
+    <clipPath id="frameClip"><rect width="1080" height="1920"/></clipPath>
+  </defs>
+  <g clip-path="url(#frameClip)">
+    <g id="cam"><g id="world"></g></g>
+    <g id="caps"></g>
+    <g id="hud"></g>
+    <g id="wipe"></g>
+    <rect id="flash" width="1080" height="1920" fill="#FFFFFF" opacity="0"/>
+    <rect id="fade" width="1080" height="1920" fill="#2B1D14" opacity="0"/>
+  </g>
+</svg>
+<canvas id="paper" width="1080" height="1920"></canvas>
+<canvas id="fx" width="1080" height="1920"></canvas>
+
+<script>
+// ============================================================
+// Ep. 6 · The Bifrost — Halftone Dossier, 1080×1920, 30 fps.
+// Picture is a pure function of t. Timings: TREATMENT.md / timeline.json.
+// Engine helpers adapted from the Halftone Dossier demo (technique only).
+// ============================================================
+const W = 1080, H = 1920, FPS = 30, DUR = 64.3;
+const NS = 'http://www.w3.org/2000/svg';
+const C = {
+  paper: '#EAD9B4', sheet: '#F4E8CC', ink: '#2B1D14', teal: '#1F5C61',
+  mustard: '#E3A62B', red: '#D4381E', cream: '#F6EBD2',
+};
+const F = { slab: "'Alfa Slab One'", bagel: "'Bagel Fat One'", sans: "'Archivo Black'", mono: "'JetBrains Mono'" };
+const LW = 7;
+
+// every hit sits on the eighth-note grid of the score: 0.35 + 0.3·k s (100 BPM)
+const T = {
+  classified: 0.35, w1: 3.95, under: 4.25, mapcard: 6.65, unmapped: 6.95, routes: 7.25, bifrost: 9.65,
+  w2: 12.05, wallHead: 12.35, brick: 14.75, swing: 15.05, push: 16.0, bloom: 18.35, onlyTag: 19.25,
+  w3: 21.65, cicada: 22.25, netline: 23.45, tilt: 25.85, failed: 26.75,
+  w4: 29.45, infil: 29.75, one: 30.35, kat: 34.55,
+  w5: 36.95, report: 37.25, unredact: 38.45, zoom: 40.85, challenge: 42.35, password: 44.45,
+  cut6: 47.15, statements: 47.45, mug: [47.15, 47.75, 48.35], bubble: 49.25, empty: 53.15, unconvinced: 54.35, nervous: 55.0,
+  w7: 58.25, question: 58.55, answer: 60.95, unsolved: 61.55,
+};
+const WIPES = [[T.w1, C.teal], [T.w2, C.ink], [T.w3, C.mustard], [T.w4, C.red], [T.w5, C.teal], [T.w7, C.ink]];
+
+function el(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function txt(parent, str, attrs) { const e = el('text', attrs, parent); e.textContent = str; return e; }
+function tf(e, x = 0, y = 0, s = 1, r = 0, sy) {
+  e.setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${r.toFixed(2)}) scale(${s.toFixed(4)} ${(sy ?? s).toFixed(4)})`);
+}
+function op(e, o) { e.setAttribute('opacity', Math.max(0, Math.min(1, o)).toFixed(3)); }
+function show(e, v) { e.style.display = v ? '' : 'none'; }
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, p) => a + (b - a) * p;
+const E = {
+  out: p => 1 - Math.pow(1 - p, 3),
+  in: p => p * p * p,
+  io: p => p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2,
+  back: p => { const c = 1.9; return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); },
+};
+const pop = (t, t0, d = 0.35) => t < t0 ? 0 : E.back(seg(t, t0, t0 + d));
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const mctx = document.createElement('canvas').getContext('2d');
+function measure(str, size, family, weight = 400) { mctx.font = `${weight} ${size}px ${family}`; return mctx.measureText(str).width; }
+function blinkAt(t, times, d = 0.16) {
+  let o = 1;
+  for (const b of times) { const p = seg(t, b, b + d); if (p > 0 && p < 1) o = Math.min(o, Math.abs(1 - 2 * p)); }
+  return o;
+}
+
+// ---------- readable-text registry (for readcheck) ----------
+const TXT = [];
+function reg(id, text, node, pass = false, vis = null) { TXT.push({ id, text, node, pass, vis }); return node; }
+const allIn = (c) => () => parseFloat(c.items[c.items.length - 1].g.getAttribute('opacity') ?? '1') >= 0.99;
+function visible(node) {
+  let o = 1;
+  for (let n = node; n && n.nodeType === 1 && n.id !== 'stage'; n = n.parentNode) {
+    if (n.style && n.style.display === 'none') return 0;
+    const a = n.getAttribute && n.getAttribute('opacity');
+    if (a !== null && a !== undefined) o *= parseFloat(a);
+  }
+  return o;
+}
+
+// ---------- per-character text ----------
+function chars(parent, str, o) {
+  let { x, y, size, family = F.slab, weight = 400, fill = C.ink, anchor = 'start', ls = 0, shadow, stroke, sw = 0, maxW } = o;
+  if (maxW) { const w0 = [...str].reduce((a, c) => a + measure(c, size, family, weight), 0); if (w0 > maxW) size = size * maxW / w0; }
+  const g = el('g', {}, parent);
+  const arr = [...str];
+  const widths = arr.map(c => measure(c, size, family, weight));
+  const total = widths.reduce((a, b) => a + b, 0) + ls * (arr.length - 1);
+  let cx = anchor === 'middle' ? x - total / 2 : anchor === 'end' ? x - total : x;
+  const items = arr.map((ch, i) => {
+    const cg = el('g', {}, g);
+    const base = { x: 0, y: 0, 'font-size': size, 'font-family': family, 'font-weight': weight, 'text-anchor': 'middle' };
+    if (shadow) txt(cg, ch, { ...base, x: shadow.dx, y: shadow.dy, fill: shadow.fill, class: 'mul' });
+    const st = stroke ? { stroke, 'stroke-width': sw, 'paint-order': 'stroke', 'stroke-linejoin': 'round' } : {};
+    txt(cg, ch, { ...base, fill, ...st });
+    const it = { g: cg, x: cx + widths[i] / 2, y, w: widths[i], size };
+    cx += widths[i] + ls;
+    tf(cg, it.x, it.y);
+    return it;
+  });
+  return { g, items, total, size, str };
+}
+function charsPop(c, t, t0, stagger = 0.04, d = 0.38, from = 60) {
+  c.items.forEach((it, i) => {
+    const s = t0 + i * stagger;
+    const p = seg(t, s, s + d);
+    const h = it.size * 0.35;
+    if (t < s) { op(it.g, 0); return; }
+    op(it.g, 1);
+    const sc = E.back(p);
+    const sq = 1 + 0.25 * Math.sin(p * Math.PI) * (1 - p);
+    it.g.setAttribute('transform', `translate(${it.x} ${it.y + from * (1 - E.out(p))}) translate(0 ${-h}) scale(${(sc / sq).toFixed(3)} ${(sc * sq).toFixed(3)}) translate(0 ${h})`);
+  });
+}
+function charsShow(c, on) { c.items.forEach(it => { op(it.g, on ? 1 : 0); tf(it.g, it.x, it.y); }); }
+function headline(parent, id, str, o) {
+  const c = chars(parent, str, { x: 70, size: 120, maxW: 940, family: F.slab, ...o });
+  reg(id, str, c.g, false, allIn(c));
+  return c;
+}
+
+// ---------- halftone ----------
+function halftone(parent, { x0 = 0, y0 = 0, w = W, h = H, step = 22, angle = 15, color, f, maxK = 0.64 }) {
+  const a = angle * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+  const n = Math.ceil(Math.hypot(w, h) / step / 2) + 2;
+  let d = '';
+  for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) {
+    const u = i * step, v = j * step;
+    const x = x0 + w / 2 + u * ca - v * sa, y = y0 + h / 2 + u * sa + v * ca;
+    if (x < x0 - step || x > x0 + w + step || y < y0 - step || y > y0 + h + step) continue;
+    const s = clamp(f(x, y)); if (s < 0.05) continue;
+    const r = s * step * maxK;
+    d += `M${(x - r).toFixed(1)} ${y.toFixed(1)}a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(2 * r).toFixed(1)} 0a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(-2 * r).toFixed(1)} 0`;
+  }
+  return el('path', { d, fill: color }, parent);
+}
+const radial = (cx, cy, R, pw = 1.2) => (x, y) => Math.pow(clamp(1 - Math.hypot(x - cx, y - cy) / R), pw);
+const edge = (R = 1100, pw = 1.6) => (x, y) => Math.pow(clamp(Math.hypot((x - 540) * 1.6, y - 960) / R - 0.35), pw) * 1.3;
+const ramp = (y0, y1, a = 0.2, b = 1) => (x, y) => a + (b - a) * clamp((y - y0) / (y1 - y0));
+function bg(parent, color) { return el('rect', { width: W, height: H, fill: color }, parent); }
+
+// ---------- stamp ----------
+function stampEl(parent, str, { size = 100, color = C.red, padX = 40, padY = 20, border = 10 } = {}) {
+  const g = el('g', {}, parent);
+  const inner = el('g', { filter: 'url(#stampInk)' }, g);
+  const w = measure(str, size, F.sans) + padX * 2, h = size * 1.08 + padY * 2;
+  el('rect', { x: -w / 2, y: -h / 2, width: w, height: h, rx: 18, fill: 'none', stroke: color, 'stroke-width': border }, inner);
+  el('rect', { x: -w / 2 + border * 1.8, y: -h / 2 + border * 1.8, width: w - border * 3.6, height: h - border * 3.6, rx: 10, fill: 'none', stroke: color, 'stroke-width': border * 0.35 }, inner);
+  txt(inner, str, { x: 0, y: size * 0.36, 'font-size': size, 'font-family': F.sans, fill: color, 'text-anchor': 'middle' });
+  return { g, w, h };
+}
+function stampAnim(s, t, t0, x, y, rot) {
+  if (t < t0 - 0.09) { op(s.g, 0); return; }
+  const p = seg(t, t0 - 0.09, t0);
+  const after = Math.max(0, t - t0);
+  const bounce = 1 + 0.05 * Math.sin(after * 30) * Math.exp(-after * 9);
+  op(s.g, p < 1 ? 0.3 + 0.7 * p : 0.93);
+  tf(s.g, x, y, lerp(2.6, 1, E.in(p)) * bounce, rot);
+}
+
+// ---------- glossy eye (shared by every character) ----------
+function eyeEl(parent, x, y, rx = 18, ry = 23) {
+  const g = el('g', {}, parent);
+  const open = el('g', {}, g);
+  const pupil = el('g', {}, open);
+  el('ellipse', { cx: 0, cy: 0, rx, ry, fill: C.ink }, pupil);
+  el('circle', { cx: rx * 0.33, cy: -ry * 0.4, r: rx * 0.42, fill: C.cream }, pupil);
+  el('circle', { cx: -rx * 0.33, cy: ry * 0.4, r: rx * 0.18, fill: C.cream }, pupil);
+  const closed = el('path', { d: `M ${-rx} -2 Q 0 ${ry * 0.55} ${rx} -2`, fill: 'none', stroke: C.ink, 'stroke-width': 7, 'stroke-linecap': 'round' }, g);
+  return { g, open, pupil, closed, x, y };
+}
+function setEye(e, open = 1, lx = 0, ly = 0) {
+  tf(e.g, e.x, e.y);
+  show(e.open, open > 0.18); show(e.closed, open <= 0.18);
+  e.open.setAttribute('transform', `scale(1 ${Math.max(open, 0.18).toFixed(3)})`);
+  tf(e.pupil, lx, ly);
+}
+
+// ---------- stage ----------
+const world = document.getElementById('world'), cam = document.getElementById('cam');
+const capsG = document.getElementById('caps'), hud = document.getElementById('hud');
+const wipe = document.getElementById('wipe'), flash = document.getElementById('flash'), fade = document.getElementById('fade');
+const scenes = [];
+let camZ = { s: 1, cx: 540, cy: 960, dx: 0, dy: 0 };   // per-scene camera, set by the active scene each frame
+function scene(t0, t1, build) {
+  const g = el('g', {}, world);
+  const s = { g, t0, t1 };
+  s.update = build(g, s);
+  scenes.push(s);
+  return s;
+}
+
+// ============================================================
+// scenes
+// ============================================================
+function buildAll() {
+
+  // ---------------- P0 cover 0 – 3.95 ----------------
+  scene(0, T.w1, (g) => {
+    bg(g, C.paper);
+    halftone(g, { color: C.mustard, step: 24, angle: 15, f: radial(540, 900, 760, 1.1), maxK: 0.62 });
+    halftone(g, { color: C.teal, step: 22, angle: 60, f: edge(1150, 1.5), maxK: 0.64 }).setAttribute('class', 'mul');
+    const folder = el('g', {}, g);
+    const fb = el('g', { filter: 'url(#boil)' }, folder);
+    el('path', { d: 'M 110 470 L 110 420 Q 110 400 130 400 L 420 400 Q 440 400 452 420 L 480 470 Z', fill: C.mustard, stroke: C.ink, 'stroke-width': LW, 'stroke-linejoin': 'round' }, fb);
+    el('rect', { x: 90, y: 470, width: 900, height: 900, rx: 18, fill: C.mustard, stroke: C.ink, 'stroke-width': LW }, fb);
+    halftone(folder, { x0: 90, y0: 470, w: 900, h: 900, color: C.red, step: 20, angle: 30, f: ramp(470, 1370, 0.05, 0.42), maxK: 0.6 }).setAttribute('class', 'mul');
+    reg('tab', 'CICADA', txt(folder, 'CICADA', { x: 140, y: 452, 'font-size': 34, 'font-family': F.mono, 'font-weight': 800, fill: C.ink }));
+    const label = el('g', {}, folder);
+    el('rect', { x: 150, y: 540, width: 520, height: 70, rx: 6, fill: C.sheet, stroke: C.ink, 'stroke-width': 5 }, label);
+    reg('label', 'FILE 06 · THE BIFROST', txt(label, 'FILE 06 · THE BIFROST', { x: 172, y: 588, 'font-size': 30, 'font-family': F.mono, 'font-weight': 800, fill: C.ink }));
+    const h1 = chars(folder, "THE THIEVES'", { x: 150, y: 820, size: 128, maxW: 800, fill: C.ink, shadow: { fill: C.teal, dx: 8, dy: 8 } });
+    const h2 = chars(folder, 'GUILD', { x: 150, y: 975, size: 150, maxW: 800, fill: C.ink, shadow: { fill: C.teal, dx: 8, dy: 8 } });
+    reg('h0', "THE THIEVES' GUILD", h1.g, false, allIn(h2)); TXT.push({ id: 'h0', text: "THE THIEVES' GUILD", node: h2.g, part: true });
+    const st = stampEl(g, 'CLASSIFIED', { size: 104 });
+    reg('classified', 'CLASSIFIED', st.g);
+    return (t) => {
+      tf(folder, 0, lerp(260, 0, E.back(seg(t, 0, 0.32))));
+      charsPop(h1, t, 0.6, 0.045);
+      charsPop(h2, t, 1.15, 0.06);
+      stampAnim(st, t, T.classified, 560, 1190, -8);
+    };
+  });
+
+  // ---------------- P1 exhibit 01 · the roads 3.95 – 12.05 ----------------
+  scene(T.w1, T.w2, (g) => {
+    bg(g, C.paper);
+    halftone(g, { color: C.teal, step: 22, angle: 20, f: ramp(150, 700, 0.55, 0.05), maxK: 0.6 }).setAttribute('class', 'mul');
+    // the street
+    const street = el('g', { filter: 'url(#boil)' }, g);
+    const houses = [[60, 210, 150], [270, 170, 190], [440, 230, 130], [670, 150, 200], [820, 200, 160]];
+    houses.forEach(([x, w, hgt], i) => {
+      const top = 720 - hgt;
+      el('path', { d: `M ${x} 720 L ${x} ${top} L ${x + w / 2} ${top - 70} L ${x + w} ${top} L ${x + w} 720 Z`, fill: C.ink, stroke: C.ink, 'stroke-width': LW, 'stroke-linejoin': 'round' }, street);
+      for (let k = 0; k < 2; k++) el('rect', { x: x + 24 + k * (w - 78), y: top + 26, width: 30, height: 40, rx: 4, fill: C.mustard }, street);
+      if (i % 2 === 0) el('rect', { x: x + w / 2 - 20, y: 660, width: 40, height: 60, rx: 4, fill: C.teal }, street);
+    });
+    el('rect', { x: 0, y: 716, width: W, height: 16, fill: C.ink }, street);
+    // the underground band, dug from the road down
+    const band = el('g', {}, g);
+    const bandClip = el('clipPath', { id: 'bandClip' }, g);
+    const bandRect = el('rect', { x: 0, y: 732, width: W, height: 0 }, bandClip);
+    band.setAttribute('clip-path', 'url(#bandClip)');
+    el('rect', { x: 0, y: 732, width: W, height: 560, fill: C.ink }, band);
+    halftone(band, { x0: 0, y0: 732, w: W, h: 560, color: C.teal, step: 22, angle: 35, f: (x, y) => 0.35 + 0.5 * clamp(Math.abs(x - 540) / 600) + 0.25 * clamp((y - 900) / 400), maxK: 0.6 });
+    // three routes: the Bifrost in three inks
+    const routesG = el('g', { filter: 'url(#boil)' }, band);
+    const R = [
+      { d: 'M 40 900 L 300 900 L 380 980 L 700 980 L 780 900 L 1040 900', c: C.teal, st: [[300, 900], [700, 980], [1040, 900]] },
+      { d: 'M 40 1060 L 220 1060 L 300 1140 L 620 1140 L 700 1060 L 1040 1060', c: C.mustard, st: [[220, 1060], [620, 1140], [940, 1060]] },
+      { d: 'M 130 760 L 130 1170 L 190 1230 L 890 1230 L 960 1160 L 960 790', c: C.red, st: [[130, 900], [560, 1230], [960, 980]] },
+    ];
+    const routes = R.map((r, i) => {
+      const halo = el('path', { d: r.d, fill: 'none', stroke: C.cream, 'stroke-width': 30, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, routesG);
+      const p = el('path', { d: r.d, fill: 'none', stroke: r.c, 'stroke-width': 18, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, routesG);
+      const len = p.getTotalLength();
+      for (const e of [halo, p]) e.setAttribute('stroke-dasharray', `${len} ${len}`);
+      const tip = el('circle', { r: 13, fill: C.cream, stroke: C.ink, 'stroke-width': 5 }, routesG);
+      const stations = r.st.map(([x, y]) => {
+        const sg = el('g', {}, routesG);
+        el('circle', { cx: x, cy: y, r: 15, fill: C.cream, stroke: C.ink, 'stroke-width': 6 }, sg);
+        return { g: sg, at: (() => { let best = 0, bd = 1e9; for (let L = 0; L <= len; L += 4) { const q = p.getPointAtLength(L); const dd = Math.hypot(q.x - x, q.y - y); if (dd < bd) { bd = dd; best = L; } } return best / len; })() };
+      });
+      // the hidden wall on every road: a small brick block beside the line
+      const [wx, wy] = r.st[1];
+      const wall = el('g', {}, routesG);
+      for (let k = 0; k < 3; k++) for (let j = 0; j < 2; j++) el('rect', { x: wx - 34 + j * 34 + (k % 2) * 17, y: wy - 70 + k * 16, width: 32, height: 14, fill: C.mustard, stroke: C.ink, 'stroke-width': 3 }, wall);
+      return { halo, p, len, tip, stations, wall, t0: T.routes + i * 0.6, d: 1.5 };
+    });
+    // the map card (unmapped)
+    const card = el('g', {}, g);
+    const cardIn = el('g', { filter: 'url(#boil)' }, card);
+    el('rect', { x: -200, y: -120, width: 400, height: 240, rx: 8, fill: C.sheet, stroke: C.ink, 'stroke-width': 6 }, cardIn);
+    for (let k = 1; k < 5; k++) el('line', { x1: -200 + k * 80, x2: -200 + k * 80, y1: -120, y2: 120, stroke: C.teal, 'stroke-width': 2, opacity: .5 }, cardIn);
+    for (let k = 1; k < 3; k++) el('line', { x1: -200, x2: 200, y1: -120 + k * 80, y2: -120 + k * 80, stroke: C.teal, 'stroke-width': 2, opacity: .5 }, cardIn);
+    txt(card, '?', { x: 0, y: 50, 'font-size': 150, 'font-family': F.bagel, fill: C.teal, 'text-anchor': 'middle' });
+    txt(card, 'N', { x: 160, y: -80, 'font-size': 30, 'font-family': F.mono, 'font-weight': 800, fill: C.ink, 'text-anchor': 'middle' });
+    const unm = stampEl(g, 'UNMAPPED', { size: 70 });
+    reg('unmapped', 'UNMAPPED', unm.g);
+    const hU = headline(g, 'h1a', 'UNDERGROUND', { y: 360, size: 116, fill: C.ink, shadow: { fill: C.teal, dx: 8, dy: 8 } });
+    const hB = headline(g, 'h1b', 'THE BIFROST', { y: 360, size: 132, fill: C.ink, shadow: { fill: C.red, dx: 8, dy: 8 } });
+    const arrow = el('g', {}, g);
+    el('path', { d: 'M 0 0 L 0 120 M -26 92 L 0 124 L 26 92', fill: 'none', stroke: C.mustard, 'stroke-width': 12, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, arrow);
+    return (t) => {
+      bandRect.setAttribute('height', (560 * E.out(seg(t, T.under, T.under + 0.75))).toFixed(1));
+      tf(arrow, 70, lerp(760, 790, Math.sin(t * 5) * 0.5 + 0.5)); op(arrow, seg(t, T.under + 0.4, T.under + 0.6) * (1 - seg(t, T.routes - 0.2, T.routes)));
+      // headlines: UNDERGROUND until the name slams in
+      if (t < T.bifrost) { show(hU.g, true); charsPop(hU, t, T.under, 0.04); show(hB.g, false); }
+      else {
+        show(hU.g, false); show(hB.g, true);
+        const p = seg(t, T.bifrost - 0.09, T.bifrost);
+        const after = Math.max(0, t - T.bifrost);
+        const sc = lerp(1.7, 1, E.in(p)) * (1 + 0.04 * Math.sin(after * 30) * Math.exp(-after * 9));
+        charsShow(hB, true);
+        hB.g.setAttribute('transform', `translate(70 330) scale(${sc.toFixed(4)}) translate(-70 -330)`);
+      }
+      // the map card and its stamp
+      tf(card, 730, 560, pop(t, T.mapcard, 0.3), 4);
+      op(card, t >= T.mapcard ? 1 : 0);
+      stampAnim(unm, t, T.unmapped, 720, 600, -9);
+      // routes draw on
+      for (const r of routes) {
+        const p = E.io(seg(t, r.t0, r.t0 + r.d));
+        const off = (r.len * (1 - p)).toFixed(1);
+        r.p.setAttribute('stroke-dashoffset', off); r.halo.setAttribute('stroke-dashoffset', off);
+        op(r.p, p > 0 ? 1 : 0); op(r.halo, p > 0 ? 1 : 0);
+        const q = r.p.getPointAtLength(r.len * p);
+        tf(r.tip, q.x, q.y, p > 0 && p < 1 ? 1 : 0);
+        r.stations.forEach(s => { const sp = pop(t, r.t0 + r.d * s.at, 0.3); tf(s.g, 0, 0, 1); op(s.g, sp > 0 ? 1 : 0); });
+        op(r.wall, seg(t, r.t0 + r.d, r.t0 + r.d + 0.15));
+      }
+      // camera: slow push toward the tunnels
+      camZ = { s: lerp(1, 1.05, E.io(seg(t, T.w1, T.w2))), cx: 540, cy: 1000 };
+    };
+  });
+
+  // ---------------- P2 exhibit 02 · the false wall 12.05 – 21.65 (secret: dark ground) ----------------
+  scene(T.w2, T.w3, (g) => {
+    bg(g, C.ink);
+    halftone(g, { color: C.teal, step: 22, angle: 25, f: edge(1050, 1.3), maxK: 0.62 });
+    // tunnel mouth
+    const arch = el('g', { filter: 'url(#boil)' }, g);
+    el('path', { d: 'M 150 1260 L 150 760 Q 150 520 540 520 Q 930 520 930 760 L 930 1260 Z', fill: C.teal, stroke: C.cream, 'stroke-width': LW, 'stroke-linejoin': 'round' }, arch);
+    for (let k = 0; k < 9; k++) {
+      const a = Math.PI * (k / 8);
+      el('line', { x1: 540 - Math.cos(a) * 390, y1: 760 - Math.sin(a) * 240, x2: 540 - Math.cos(a) * 310, y2: 760 - Math.sin(a) * 160, stroke: C.ink, 'stroke-width': 6 }, arch);
+    }
+    // the sanctuary behind the wall
+    const sanct = el('g', {}, g);
+    const sClip = el('clipPath', { id: 'sanctClip' }, g);
+    el('path', { d: 'M 230 1260 L 230 790 Q 230 600 540 600 Q 850 600 850 790 L 850 1260 Z' }, sClip);
+    sanct.setAttribute('clip-path', 'url(#sanctClip)');
+    el('rect', { x: 200, y: 580, width: 680, height: 700, fill: C.ink }, sanct);
+    const glow = el('g', {}, sanct);
+    const lanterns = [];
+    for (const [x, y] of [[360, 760], [540, 700], [720, 770]]) {
+      const lg = el('g', {}, sanct);
+      el('line', { x1: 0, y1: -130, x2: 0, y2: -40, stroke: C.cream, 'stroke-width': 4 }, lg);
+      const lb = el('g', { filter: 'url(#boil)' }, lg);
+      el('path', { d: 'M -28 -40 L 28 -40 L 36 30 L -36 30 Z', fill: C.mustard, stroke: C.cream, 'stroke-width': 5, 'stroke-linejoin': 'round' }, lb);
+      el('rect', { x: -14, y: -24, width: 28, height: 38, rx: 6, fill: C.cream }, lb);
+      lanterns.push({ g: lg, x, y });
+    }
+    const crates = el('g', { filter: 'url(#boil)' }, sanct);
+    for (const [x, y, s] of [[300, 1150, 110], [410, 1180, 80], [700, 1140, 120]]) {
+      el('rect', { x, y, width: s, height: s * 0.8, fill: C.teal, stroke: C.cream, 'stroke-width': 5 }, crates);
+      el('path', { d: `M ${x} ${y} L ${x + s} ${y + s * 0.8} M ${x + s} ${y} L ${x} ${y + s * 0.8}`, stroke: C.cream, 'stroke-width': 3 }, crates);
+    }
+    // the wall (hinged on the left side of the opening)
+    const wallG = el('g', {}, g);
+    const wallIn = el('g', { 'clip-path': 'url(#sanctClip)' }, wallG);
+    const bricks = el('g', { filter: 'url(#boil)' }, wallIn);
+    let pressed = null;
+    for (let row = 0; row < 11; row++) {
+      const y = 600 + row * 60;
+      for (let col = -1; col < 6; col++) {
+        const x = 230 + col * 130 + (row % 2) * 65;
+        const isP = row === 6 && col === 3;
+        const b = el('rect', { x, y, width: 124, height: 54, rx: 4, fill: isP ? C.mustard : C.teal, stroke: C.ink, 'stroke-width': 5 }, bricks);
+        if (isP) pressed = b;
+      }
+    }
+    halftone(wallIn, { x0: 230, y0: 600, w: 620, h: 660, color: C.ink, step: 20, angle: 45, f: ramp(600, 1260, 0.15, 0.6), maxK: 0.6 }).setAttribute('class', 'mul');
+    el('path', { d: 'M 230 1260 L 230 790 Q 230 600 540 600 Q 850 600 850 790 L 850 1260', fill: 'none', stroke: C.cream, 'stroke-width': LW }, g);
+    const hA = headline(g, 'h2a', 'THE FALSE WALL', { y: 360, size: 112, fill: C.cream, shadow: { fill: C.red, dx: 8, dy: 8 } });
+    const hS = headline(g, 'h2b', 'SANCTUARY', { y: 360, size: 132, fill: C.mustard, shadow: { fill: C.red, dx: 8, dy: 8 } });
+    const only = stampEl(g, 'THIEVES ONLY', { size: 46, border: 7, padX: 24, padY: 12 });
+    reg('only', 'THIEVES ONLY', only.g);
+    // drips along the tunnel walls
+    const drips = [];
+    for (let k = 0; k < 6; k++) drips.push({ e: el('ellipse', { rx: 5, ry: 8, fill: C.cream }, g), x: k % 2 ? 175 + k * 3 : 905 - k * 3, ph: k * 0.37 });
+    return (t) => {
+      // headline swap at the bloom
+      if (t < T.bloom) { show(hA.g, true); show(hS.g, false); charsPop(hA, t, T.wallHead, 0.035); }
+      else { show(hA.g, false); show(hS.g, true); charsPop(hS, t, T.bloom, 0.05); }
+      stampAnim(only, t, T.onlyTag, 760, 640, 8);
+      // the pressed brick sinks, then the wall swings open on its hinge
+      const sink = seg(t, T.brick, T.brick + 0.18);
+      pressed.setAttribute('transform', `translate(${(6 * sink).toFixed(1)} ${(4 * sink).toFixed(1)})`);
+      const sw = E.io(seg(t, T.swing, T.swing + 0.9));
+      const shake = t > T.swing && t < T.swing + 0.9 ? Math.sin(t * 70) * 3 * (1 - sw) : 0;
+      wallG.setAttribute('transform', `translate(230 0) scale(${(1 - 0.86 * sw).toFixed(4)} 1) skewY(${(-6 * sw).toFixed(2)}) translate(-230 ${shake.toFixed(2)})`);
+      // glow behind the wall: dots swell into a halo (dot density = emotion)
+      const k = 0.25 * seg(t, T.swing, T.swing + 0.9) + 0.75 * E.back(seg(t, T.bloom, T.bloom + 0.6));
+      glow.innerHTML = '';
+      if (k > 0.02) halftone(glow, { x0: 220, y0: 590, w: 640, h: 680, color: C.mustard, step: 22, angle: 15, f: radial(540, 900, 160 + 420 * k, 0.9), maxK: 0.7 * Math.min(1, k + 0.2) });
+      lanterns.forEach((L, i) => tf(L.g, L.x, L.y, 1, Math.sin(t * 1.6 + i) * 4));
+      drips.forEach(d => { const p = ((t + d.ph) % 1.7) / 1.7; tf(d.e, d.x, 780 + p * 470); op(d.e, p < 0.9 ? 0.8 : 0); });
+      // camera: push in through the opening
+      camZ = { s: lerp(1, 1.12, E.io(seg(t, T.push, T.w3))), cx: 540, cy: 930 };
+    };
+  });
+
+  // ---------------- P3 exhibit 03 · Cicada 21.65 – 29.45 ----------------
+  scene(T.w3, T.w4, (g) => {
+    bg(g, C.paper);
+    const big = el('g', {}, g);
+    const clip = el('clipPath', { id: 'num03' }, g);
+    txt(clip, '03', { x: 1150, y: 1230, 'font-size': 640, 'font-family': F.bagel, 'text-anchor': 'end' });
+    txt(big, '03', { x: 1150, y: 1230, 'font-size': 640, 'font-family': F.bagel, fill: C.mustard, 'text-anchor': 'end' });
+    const bh = el('g', { 'clip-path': 'url(#num03)' }, big);
+    halftone(bh, { color: C.red, step: 20, angle: 25, f: ramp(700, 1250, 0.15, 0.85), maxK: 0.68 });
+    halftone(g, { color: C.teal, step: 22, angle: 70, f: radial(0, 1920, 900, 1.2), maxK: 0.6 }).setAttribute('class', 'mul');
+    const hC = headline(g, 'h3', 'CICADA', { y: 370, size: 176, fill: C.ink, shadow: { fill: C.mustard, dx: 8, dy: 8 } });
+    const net1 = txt(g, '', { x: 76, y: 455, 'font-size': 34, 'font-family': F.mono, 'font-weight': 800, fill: C.teal });
+    const net2 = txt(g, '', { x: 76, y: 500, 'font-size': 34, 'font-family': F.mono, 'font-weight': 800, fill: C.teal });
+    const L1 = 'SPY NETWORK OF THE', L2 = 'PALADINS OF PARABELLUM';
+    reg('net', L1 + ' ' + L2, net1); TXT.push({ id: 'net', text: L1 + ' ' + L2, node: net2, part: true });
+    // the Cicada emblem: a stocky insect
+    const bug = el('g', {}, g);
+    const bugIn = el('g', { filter: 'url(#boil)' }, bug);
+    const S = { stroke: C.ink, 'stroke-width': LW, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' };
+    const wingL = el('g', {}, bugIn), wingR = el('g', {}, bugIn);
+    for (const [wg, sx] of [[wingL, -1], [wingR, 1]]) {
+      const w2 = el('g', { transform: `scale(${sx} 1)` }, wg);
+      el('path', { d: 'M 20 -40 C 120 -110 250 -60 270 40 C 230 90 120 70 20 20 Z', fill: C.cream, ...S }, w2);
+      el('path', { d: 'M 30 -10 C 110 -40 190 -20 250 30 M 80 -40 L 120 40 M 160 -50 L 190 45', fill: 'none', stroke: C.teal, 'stroke-width': 4, 'stroke-linecap': 'round' }, w2);
+    }
+    for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) el('path', { d: `M ${sx * 50} ${40 + k * 40} q ${sx * 50} 10 ${sx * 70} 40`, fill: 'none', ...S, 'stroke-width': 9 }, bugIn);
+    el('path', { d: 'M -78 -20 C -78 -110 78 -110 78 -20 L 70 120 C 60 190 -60 190 -70 120 Z', fill: C.mustard, ...S }, bugIn);
+    el('path', { d: 'M -66 40 L 66 40 M -62 85 L 62 85 M -54 128 L 54 128', stroke: C.teal, 'stroke-width': 12, 'stroke-linecap': 'round' }, bugIn);
+    el('ellipse', { cx: 0, cy: -70, rx: 96, ry: 58, fill: C.teal, ...S }, bugIn);
+    const bugEyes = [eyeEl(bug, -58, -78, 22, 26), eyeEl(bug, 58, -78, 22, 26)];
+    // entry attempts, each stamped FAILED
+    const slips = [];
+    for (let i = 0; i < 6; i++) {
+      const col = i % 3, row = Math.floor(i / 3);
+      const x = 100 + col * 300, y = 1000 + row * 150;
+      const sg = el('g', {}, g);
+      const si = el('g', { filter: 'url(#boil)' }, sg);
+      el('rect', { x: 0, y: 0, width: 260, height: 125, rx: 6, fill: C.sheet, stroke: C.ink, 'stroke-width': 5 }, si);
+      el('circle', { cx: 130, cy: 10, r: 9, fill: C.red, stroke: C.ink, 'stroke-width': 4 }, si);
+      txt(sg, `ENTRY ATTEMPT ${String(i + 1).padStart(2, '0')}`, { x: 18, y: 44, 'font-size': 21, 'font-family': F.mono, 'font-weight': 800, fill: C.ink });
+      for (let k = 0; k < 2; k++) el('rect', { x: 18, y: 62 + k * 24, width: 150 + 60 * ((i + k) % 2), height: 12, fill: C.teal, opacity: .55 }, sg);
+      const st = stampEl(sg, 'FAILED', { size: 44, border: 7, padX: 18, padY: 8 });
+      reg('failed' + i, 'FAILED', st.g, i > 0);
+      slips.push({ g: sg, x, y, st, t: T.failed + 0.3 * i, rot: [-6, 5, -3, 7, -8, 4][i] });
+    }
+    return (t) => {
+      charsPop(hC, t, T.cicada, 0.05);
+      const n1 = Math.floor(clamp((t - T.netline) / 0.03, 0, L1.length)), n2 = Math.floor(clamp((t - T.netline - L1.length * 0.03) / 0.03, 0, L2.length));
+      net1.textContent = L1.slice(0, n1); net2.textContent = L2.slice(0, n2);
+      // the emblem drops in and squashes
+      const land = seg(t, T.cicada - 0.3, T.cicada);
+      const a = Math.max(0, t - T.cicada);
+      const sq = t >= T.cicada ? 1 - 0.16 * Math.exp(-a * 7) * Math.cos(a * 21) : 1;
+      tf(bug, 690, lerp(-300, 760, E.in(land)), 1);
+      bug.setAttribute('transform', bug.getAttribute('transform') + ` scale(${(1 / sq).toFixed(3)} ${sq.toFixed(3)})`);
+      const fl = Math.sin(t * 52) * 5 * (0.4 + 0.6 * (t > T.cicada && t < T.cicada + 0.8 ? 1 : 0.15));
+      wingL.setAttribute('transform', `translate(-40 -20) rotate(${(-fl).toFixed(2)})`);
+      wingR.setAttribute('transform', `translate(40 -20) rotate(${fl.toFixed(2)})`);
+      const o = blinkAt(t, [24.1, 26.0, 28.6]);
+      bugEyes.forEach((e, i) => setEye(e, o, Math.sin(t * 1.3) * 4, 0));
+      // slips: pinned, then stamped one per eighth note
+      slips.forEach((s, i) => {
+        const sp = pop(t, T.tilt + 0.06 * i, 0.3);
+        tf(s.g, s.x, s.y + 40 * (1 - sp), 1, s.rot * 0.3);
+        op(s.g, sp > 0 ? 1 : 0);
+        stampAnim(s.st, t, s.t, 130, 74, s.rot);
+      });
+      camZ = { s: 1, cx: 540, cy: 960, dy: -70 * E.io(seg(t, T.tilt, T.tilt + 0.8)) };
+    };
+  });
+
+  // ---------------- P4 exhibit 04 · infiltrations / Agent Kat 29.45 – 36.95 ----------------
+  scene(T.w4, T.w5, (g) => {
+    bg(g, C.paper);
+    halftone(g, { color: C.teal, step: 22, angle: 20, f: edge(1150, 1.5), maxK: 0.64 }).setAttribute('class', 'mul');
+    const rep = txt(g, 'REPORTED', { x: 76, y: 250, 'font-size': 36, 'font-family': F.mono, 'font-weight': 800, fill: C.red });
+    reg('reported', 'REPORTED', rep);
+    const hI = headline(g, 'h4', 'INFILTRATIONS', { y: 360, size: 100, fill: C.ink, shadow: { fill: C.teal, dx: 8, dy: 8 } });
+    const one = el('g', {}, g);
+    const clip = el('clipPath', { id: 'num1' }, g);
+    txt(clip, '1', { x: 0, y: 380, 'font-size': 980, 'font-family': F.bagel, 'text-anchor': 'middle' });
+    txt(one, '1', { x: 0, y: 380, 'font-size': 980, 'font-family': F.bagel, fill: C.mustard, 'text-anchor': 'middle', stroke: C.ink, 'stroke-width': 10, 'paint-order': 'stroke' });
+    const oh = el('g', { 'clip-path': 'url(#num1)' }, one);
+    halftone(oh, { x0: -400, y0: -400, w: 800, h: 800, color: C.red, step: 22, angle: 30, f: ramp(-300, 380, 0.15, 0.8), maxK: 0.66 });
+    reg('one', '1', el('rect', { x: -230, y: -330, width: 460, height: 710, fill: 'none' }, one));
+    // Agent Kat's card
+    const card = el('g', {}, g);
+    const ci = el('g', { filter: 'url(#boil)' }, card);
+    el('rect', { x: -300, y: -190, width: 600, height: 380, rx: 10, fill: C.sheet, stroke: C.ink, 'stroke-width': 6 }, ci);
+    el('rect', { x: -270, y: -160, width: 230, height: 320, rx: 6, fill: C.paper, stroke: C.ink, 'stroke-width': 5 }, ci);
+    const portrait = el('g', {}, card);
+    const pc = el('clipPath', { id: 'katClip' }, g);
+    el('rect', { x: -270, y: -160, width: 230, height: 320, rx: 6 }, pc);
+    portrait.setAttribute('clip-path', 'url(#katClip)');
+    halftone(portrait, { x0: -270, y0: -160, w: 230, h: 320, color: C.teal, step: 18, angle: 15, f: radial(-155, -40, 260, 0.8), maxK: 0.62 });
+    el('path', { d: 'M -155 -110 C -95 -110 -78 -60 -82 -12 C -80 20 -96 40 -110 52 C -60 70 -40 110 -36 170 L -274 170 C -270 110 -250 70 -200 52 C -214 40 -230 20 -228 -12 C -232 -60 -215 -110 -155 -110 Z', fill: C.ink }, portrait);
+    const bar = el('g', {}, card);
+    el('rect', { x: -262, y: -40, width: 214, height: 44, fill: C.ink, stroke: C.cream, 'stroke-width': 3 }, bar);
+    txt(bar, 'REDACTED', { x: -155, y: -11, 'font-size': 20, 'font-family': F.mono, 'font-weight': 800, fill: C.cream, 'text-anchor': 'middle' });
+    const nm = el('g', {}, card);
+    txt(nm, 'AGENT', { x: -10, y: -70, 'font-size': 34, 'font-family': F.mono, 'font-weight': 800, fill: C.teal });
+    txt(nm, 'KAT', { x: -16, y: 66, 'font-size': 140, 'font-family': F.bagel, fill: C.ink });
+    txt(nm, 'CICADA · FIELD', { x: -10, y: 130, 'font-size': 24, 'font-family': F.mono, 'font-weight': 800, fill: C.red });
+    reg('kat', 'AGENT KAT', nm);
+    return (t) => {
+      op(rep, t >= T.infil - 0.1 ? 1 : 0);
+      charsPop(hI, t, T.infil, 0.03);
+      const s1 = pop(t, T.one, 0.32);
+      tf(one, 420, 940, s1, -3);
+      op(one, s1 > 0 ? 1 : 0);
+      const cp = E.back(seg(t, T.kat, T.kat + 0.4));
+      tf(card, 620, lerp(2300, 1040, cp), 1, -4 + 2 * (1 - cp));
+      op(card, t >= T.kat ? 1 : 0);
+      camZ = { s: lerp(1, 1.04, E.io(seg(t, T.one, T.w5))), cx: 540, cy: 1000 };
+    };
+  });
+
+  // ---------------- P5 exhibit 05 · Kat's report 36.95 – 47.15 ----------------
+  scene(T.w5, T.cut6, (g) => {
+    bg(g, C.paper);
+    halftone(g, { color: C.mustard, step: 24, angle: 15, f: radial(1080, 300, 700, 1.1), maxK: 0.6 }).setAttribute('class', 'mul');
+    const hR = headline(g, 'h5', "KAT'S REPORT", { y: 360, size: 112, fill: C.ink, shadow: { fill: C.teal, dx: 8, dy: 8 } });
+    const sheet = el('g', {}, g);
+    const si = el('g', { filter: 'url(#boil)' }, sheet);
+    el('rect', { x: 80, y: 470, width: 920, height: 790, rx: 6, fill: C.sheet, stroke: C.ink, 'stroke-width': 6 }, si);
+    const shClip = el('clipPath', { id: 'sheetClip' }, g);
+    el('rect', { x: 80, y: 470, width: 920, height: 790, rx: 6 }, shClip);
+    const dots = el('g', { 'clip-path': 'url(#sheetClip)' }, sheet);
+    halftone(dots, { x0: 80, y0: 470, w: 920, h: 790, color: C.teal, step: 20, angle: 45, f: (x, y) => 0.12 + 0.2 * clamp(Math.hypot(x - 540, y - 865) / 600), maxK: 0.62 }).setAttribute('class', 'mul');
+    txt(sheet, 'FIELD REPORT', { x: 120, y: 540, 'font-size': 32, 'font-family': F.mono, 'font-weight': 800, fill: C.ink });
+    txt(sheet, 'AGENT KAT', { x: 960, y: 540, 'font-size': 32, 'font-family': F.mono, 'font-weight': 800, fill: C.red, 'text-anchor': 'end' });
+    el('line', { x1: 110, x2: 970, y1: 565, y2: 565, stroke: C.ink, 'stroke-width': 4 }, sheet);
+    const mk = (y, w) => el('rect', { x: 130, y: y - 28, width: w, height: 36, fill: C.ink }, sheet);
+    const rows = [[620, 760], [680, 640], [750, 700], [1040, 720], [1110, 560], [1180, 690]];
+    rows.forEach(([y, w]) => mk(y, w));
+    // the three lines that matter (y 820 / 900 / 980)
+    const line1 = txt(sheet, 'AT EVERY STATION:', { x: 130, y: 830, 'font-size': 36, 'font-family': F.mono, 'font-weight': 800, fill: C.ink });
+    const mark1 = el('rect', { x: 122, y: 798, width: measure('AT EVERY STATION:', 36, F.mono, 800) + 16, height: 44, fill: C.mustard }, sheet);
+    sheet.insertBefore(mark1, line1);
+    const bar1 = mk(830, 560);
+    const line2 = txt(sheet, 'A CHALLENGE.', { x: 130, y: 910, 'font-size': 36, 'font-family': F.mono, 'font-weight': 800, fill: C.ink });
+    const bar2 = mk(910, 480);
+    const line3 = txt(sheet, 'AND A PASSWORD:', { x: 130, y: 990, 'font-size': 36, 'font-family': F.mono, 'font-weight': 800, fill: C.ink });
+    const bar3 = mk(990, 540);
+    const pw = el('rect', { x: 130 + measure('AND A PASSWORD: ', 36, F.mono, 800), y: 962, width: 170, height: 36, fill: C.ink }, sheet);
+    reg('r1', 'AT EVERY STATION:', line1); reg('r2', 'A CHALLENGE.', line2); reg('r3', 'AND A PASSWORD:', line3);
+    const lift = (b, t0, x0, w) => { const p = E.io(seg(t, t0, t0 + 0.3)); b.setAttribute('x', (x0 + w * p).toFixed(1)); b.setAttribute('width', (w * (1 - p)).toFixed(1)); };
+    let t = 0;
+    return (tt) => {
+      t = tt;
+      charsPop(hR, t, T.report, 0.035);
+      tf(sheet, 0, lerp(1300, 0, E.back(seg(t, T.w5 + 0.15, T.w5 + 0.55))), 1);
+      lift(bar1, T.unredact, 130, 560); op(line1, t >= T.unredact ? 1 : 0); op(mark1, t >= T.unredact + 0.15 ? 1 : 0);
+      lift(bar2, T.challenge, 130, 480); op(line2, t >= T.challenge ? 1 : 0);
+      lift(bar3, T.password, 130, 540); op(line3, t >= T.password ? 1 : 0);
+      op(pw, t >= T.password + 0.2 ? 1 : 0);
+      // snap zoom into the line: dots become huge
+      const z = E.out(seg(t, T.zoom, T.zoom + 0.35));
+      camZ = { s: lerp(1, 1.85, z), cx: lerp(540, 365, z), cy: lerp(960, 905, z), tx: 540, ty: 900 };
+    };
+  });
+
+  // ---------------- P6 exhibit 06 · statements 47.15 – 58.25 ----------------
+  scene(T.cut6, T.w7, (g) => {
+    bg(g, C.paper);
+    const chart = el('g', {}, g);
+    for (let i = 0; i < 9; i++) {
+      const y = 520 + i * 90;
+      el('line', { x1: 40, x2: 1040, y1: y, y2: y, stroke: C.ink, 'stroke-width': i % 2 ? 2 : 4, opacity: 0.4 }, chart);
+      if (i % 2 === 0) txt(chart, `${80 - i * 5}`, { x: 44, y: y - 8, 'font-size': 22, 'font-family': F.mono, 'font-weight': 800, fill: C.ink, opacity: .6 });
+    }
+    halftone(g, { color: C.teal, step: 22, angle: 30, f: radial(540, 880, 620, 0.9), maxK: 0.6 }).setAttribute('class', 'mul');
+    const hT = headline(g, 'h6', 'STATEMENTS', { y: 360, size: 128, fill: C.ink, shadow: { fill: C.red, dx: 8, dy: 8 } });
+    // three captured thieves: hood, mask, glossy eyes, a name plate
+    const thieves = [];
+    [[220, 0.95, -3], [540, 1.05, 2], [860, 0.95, 4]].forEach(([x, s, rot], i) => {
+      const tg = el('g', {}, g);
+      const body = el('g', { filter: 'url(#boil)' }, tg);
+      const S = { stroke: C.ink, 'stroke-width': LW, 'stroke-linejoin': 'round' };
+      el('path', { d: 'M -150 520 C -150 340 -110 250 0 250 C 110 250 150 340 150 520 Z', fill: C.teal, ...S }, body);
+      el('path', { d: 'M -118 120 C -122 -10 -70 -96 0 -96 C 70 -96 122 -10 118 120 C 100 200 60 240 0 246 C -60 240 -100 200 -118 120 Z', fill: C.teal, ...S }, body);
+      el('path', { d: 'M -78 90 C -82 10 -44 -40 0 -40 C 44 -40 82 10 78 90 C 70 160 40 190 0 192 C -40 190 -70 160 -78 90 Z', fill: C.cream, ...S }, body);
+      el('path', { d: 'M -84 40 C -40 20 40 20 84 40 L 80 92 C 40 80 -40 80 -80 92 Z', fill: C.ink }, body);
+      el('path', { d: 'M -22 150 Q 0 158 22 150', fill: 'none', stroke: C.ink, 'stroke-width': 6, 'stroke-linecap': 'round' }, body);
+      const eyes = [eyeEl(tg, -38, 64, 15, 18), eyeEl(tg, 38, 64, 15, 18)];
+      const plate = el('g', {}, tg);
+      el('rect', { x: -120, y: 360, width: 240, height: 76, rx: 8, fill: C.ink }, plate);
+      txt(plate, `THIEF 0${i + 1}`, { x: 0, y: 410, 'font-size': 32, 'font-family': F.mono, 'font-weight': 800, fill: C.cream, 'text-anchor': 'middle' });
+      reg('plate' + i, `THIEF 0${i + 1}`, plate);
+      thieves.push({ g: tg, x, s, rot, eyes, t0: T.mug[i] });
+    });
+    const bub = el('g', {}, g);
+    const bw = measure('JUST EXTRA SECURITY.', 54, F.bagel) + 70;
+    el('path', { d: 'M -30 55 L 10 120 L 40 55 Z', fill: C.cream, stroke: C.ink, 'stroke-width': 6, 'stroke-linejoin': 'round' }, bub);
+    el('rect', { x: -bw / 2, y: -60, width: bw, height: 120, rx: 30, fill: C.cream, stroke: C.ink, 'stroke-width': 6 }, bub);
+    el('rect', { x: -28, y: 50, width: 66, height: 14, fill: C.cream }, bub);
+    txt(bub, 'JUST EXTRA SECURITY.', { x: 0, y: 20, 'font-size': 54, 'font-family': F.bagel, fill: C.ink, 'text-anchor': 'middle' });
+    reg('bubble', 'JUST EXTRA SECURITY.', bub);
+    const st = stampEl(g, 'UNCONVINCED', { size: 96 });
+    reg('unconvinced', 'UNCONVINCED', st.g);
+    return (t) => {
+      charsPop(hT, t, T.statements, 0.035);
+      thieves.forEach((th, i) => {
+        const a = Math.max(0, t - th.t0);
+        const sq = t >= th.t0 ? 1 - 0.05 * Math.exp(-a * 8) * Math.cos(a * 22) : 1;
+        tf(th.g, th.x, 690, th.s, th.rot + Math.sin(t * 2 + i) * 1.2);
+        th.g.setAttribute('transform', th.g.getAttribute('transform') + ` translate(0 520) scale(${(1 / sq).toFixed(3)} ${sq.toFixed(3)}) translate(0 -520)`);
+        const squint = t >= th.t0 && t < th.t0 + 0.35;
+        const nervous = t >= T.nervous;
+        const look = nervous ? Math.sign(Math.sin(t * 2.2 + i * 2.1)) * 6 * (i === 1 ? -1 : 1) : Math.sin(t * 1.4 + i) * 3;
+        const after = t >= T.unconvinced && t < T.unconvinced + 0.4;
+        const o = squint || after ? 0.12 : blinkAt(t, [50.4 + i * 0.5, 56.2 + i * 0.3]);
+        th.eyes.forEach(e => setEye(e, o, look, nervous ? -2 : 0));
+      });
+      const bp = pop(t, T.bubble, 0.3);
+      op(bub, t >= T.bubble ? 1 : 0); tf(bub, 600, 560, bp);
+      stampAnim(st, t, T.unconvinced, 540, 930, -8);
+      camZ = { s: lerp(1, 1.06, E.io(seg(t, T.nervous, T.w7))), cx: 540, cy: 900 };
+    };
+  });
+
+  // ---------------- P7 the open question 58.25 – end (secret: dark ground) ----------------
+  scene(T.w7, DUR + 1, (g) => {
+    bg(g, C.ink);
+    halftone(g, { color: C.teal, step: 22, angle: 25, f: edge(1050, 1.3), maxK: 0.62 });
+    halftone(g, { color: C.mustard, step: 24, angle: 15, f: radial(540, 760, 520, 1.4), maxK: 0.5 });
+    const q1 = chars(g, 'WHO IS THE', { x: 70, y: 640, size: 112, maxW: 940, fill: C.cream, shadow: { fill: C.red, dx: 8, dy: 8 } });
+    const q2 = chars(g, 'PASSWORD FOR?', { x: 70, y: 790, size: 112, maxW: 940, fill: C.mustard, shadow: { fill: C.red, dx: 8, dy: 8 } });
+    reg('q', 'WHO IS THE PASSWORD FOR?', q1.g, false, allIn(q2)); TXT.push({ id: 'q', text: 'WHO IS THE PASSWORD FOR?', node: q2.g, part: true });
+    const slip = el('g', {}, g);
+    const sl = el('g', { filter: 'url(#boil)' }, slip);
+    el('rect', { x: -400, y: -70, width: 800, height: 140, rx: 8, fill: C.sheet, stroke: C.cream, 'stroke-width': 5 }, sl);
+    txt(slip, 'ANSWER:', { x: -360, y: 18, 'font-size': 46, 'font-family': F.mono, 'font-weight': 800, fill: C.ink });
+    el('rect', { x: -110, y: -26, width: 470, height: 56, fill: C.ink }, slip);
+    reg('answer', 'ANSWER:', slip);
+    const st = stampEl(g, 'UNSOLVED', { size: 104 });
+    reg('unsolved', 'UNSOLVED', st.g);
+    return (t) => {
+      charsPop(q1, t, T.question, 0.04);
+      charsPop(q2, t, T.question + 0.5, 0.04);
+      const sp = E.back(seg(t, T.answer, T.answer + 0.35));
+      tf(slip, 540, lerp(2100, 1040, sp), 1, -2);
+      op(slip, t >= T.answer ? 1 : 0);
+      stampAnim(st, t, T.unsolved, 560, 1215, 7);
+      camZ = { s: lerp(1, 1.04, E.io(seg(t, T.w7, DUR))), cx: 540, cy: 900 };
+    };
+  });
+
+  buildHud();
+  buildWipe();
+}
+
+// ============================================================
+// captions (the spoken line), HUD, wipe
+// ============================================================
+const KEYS = ['roads', 'Underground', 'Unmapped', 'Bifrost', "isn't a wall", 'sanctuary', 'Cicada', 'one', 'Kat', 'odd', 'challenge', 'password', 'extra security', 'convinced', 'thieves', 'password'];
+let CAPS = [];
+function buildCaptions(lines) {
+  const size = 42, maxW = 860, lineH = 58, padX = 30, padY = 22;
+  CAPS = lines.map((L, i) => {
+    const text = L.text, key = KEYS[i];
+    const k0 = text.indexOf(key), k1 = k0 + key.length;
+    const words = []; let pos = 0;
+    for (const w of text.split(' ')) { const s = text.indexOf(w, pos); words.push({ w, s, e: s + w.length }); pos = s + w.length; }
+    const rows = [[]]; let cw = 0;
+    for (const wd of words) {
+      const ww = measure(wd.w + ' ', size, F.sans);
+      if (cw + ww > maxW && rows[rows.length - 1].length) { rows.push([]); cw = 0; }
+      rows[rows.length - 1].push(wd); cw += ww;
+    }
+    const widths = rows.map(r => measure(r.map(x => x.w).join(' '), size, F.sans));
+    const w = Math.max(...widths), h = rows.length * lineH + padY * 2 - 10;
+    const g = el('g', {}, capsG);
+    const inner = el('g', {}, g);
+    el('rect', { x: -w / 2 - padX + 8, y: -h / 2 + 8, width: w + padX * 2, height: h, rx: 16, fill: C.teal, class: 'mul' }, inner);
+    el('rect', { x: -w / 2 - padX, y: -h / 2, width: w + padX * 2, height: h, rx: 16, fill: C.ink }, inner);
+    rows.forEach((r, ri) => {
+      const te = el('text', { x: -widths[ri] / 2, y: -h / 2 + padY + size * 0.82 + ri * lineH, 'font-size': size, 'font-family': F.sans }, inner);
+      r.forEach((wd, wi) => {
+        const hot = k0 >= 0 && wd.s < k1 && wd.e > k0;
+        const sp = el('tspan', { fill: hot ? C.mustard : C.cream }, te);
+        sp.textContent = wd.w + (wi < r.length - 1 ? ' ' : '');
+      });
+    });
+    const t1 = i + 1 < lines.length ? lines[i + 1].t0 : DUR;
+    return { g, t0: L.t0, t1, x: 540, y: 1390, text };
+  });
+}
+function captionsUpdate(t) {
+  for (const c of CAPS) {
+    const on = t >= c.t0 && t < c.t1;
+    show(c.g, on);
+    if (!on) continue;
+    const p = seg(t, c.t0, c.t0 + 0.4);
+    tf(c.g, c.x, c.y + 40 * (1 - E.out(p)), lerp(0.8, 1, E.back(p)), -1.2 * (1 - p) - 0.6);
+  }
+}
+
+let hudUpdate = () => {}, wipeUpdate = () => {};
+function buildHud() {
+  const hudG = el('g', {}, hud);
+  const caseBg = el('rect', { x: 50, y: 62, width: measure('CICADA · FILE 06', 28, F.mono, 800) + 20, height: 40, rx: 6 }, hudG);
+  const caseNo = txt(hudG, 'CICADA · FILE 06', { x: 60, y: 92, 'font-size': 28, 'font-family': F.mono, 'font-weight': 800 });
+  reg('case', 'CICADA · FILE 06', caseNo);
+  const chip = el('g', {}, hudG);
+  const chipBg = el('rect', { x: 60, y: 108, height: 46, rx: 6 }, chip);
+  const chipA = txt(chip, '', { x: 74, y: 141, 'font-size': 26, 'font-family': F.sans });
+  const chipB = txt(chip, '', { y: 141, 'font-size': 26, 'font-family': F.sans });
+  const eyes = el('g', {}, hudG);
+  const eyBg = el('rect', { x: 790, y: 58, width: 230, height: 54, rx: 8, fill: 'none', 'stroke-width': 4 }, eyes);
+  const rec = el('circle', { cx: 818, cy: 85, r: 10, fill: C.red }, eyes);
+  const eyT = txt(eyes, 'EYES ONLY', { x: 840, y: 95, 'font-size': 28, 'font-family': F.mono, 'font-weight': 800 });
+  reg('eyes', 'EYES ONLY', eyT);
+  const chips = [
+    [T.w1, T.w2, 'EXHIBIT 01', 'THE ROADS'], [T.w2, T.w3, 'EXHIBIT 02', 'THE WALL'], [T.w3, T.w4, 'EXHIBIT 03', 'CICADA'],
+    [T.w4, T.w5, 'EXHIBIT 04', 'INFILTRATION'], [T.w5, T.cut6, 'EXHIBIT 05', 'THE REPORT'], [T.cut6, T.w7, 'EXHIBIT 06', 'STATEMENTS'], [T.w7, DUR + 1, 'OPEN', 'QUESTION'],
+  ];
+  chips.forEach(c => { TXT.push({ id: 'chip' + c[0], text: c[2] + ' ' + c[3], node: chip, when: [c[0], c[1]] }); });
+  hudUpdate = (t) => {
+    const c = chips.find(c => t >= c[0] && t < c[1]);
+    show(hudG, !!c);
+    if (!c) return;
+    const dark = (t >= T.w2 && t < T.w3) || t >= T.w7;
+    const ink = dark ? C.cream : C.ink;
+    caseNo.setAttribute('fill', ink); caseBg.setAttribute('fill', dark ? C.ink : C.paper); eyBg.setAttribute('fill', dark ? C.ink : C.paper);
+    chipBg.setAttribute('fill', dark ? C.cream : C.ink);
+    chipA.textContent = c[2]; chipA.setAttribute('fill', dark ? C.red : C.mustard);
+    chipB.textContent = c[3]; chipB.setAttribute('fill', dark ? C.ink : C.cream);
+    const wa = measure(c[2], 26, F.sans), wb = measure(c[3], 26, F.sans);
+    chipB.setAttribute('x', 74 + wa + 14);
+    chipBg.setAttribute('width', wa + wb + 42);
+    eyBg.setAttribute('stroke', ink); eyT.setAttribute('fill', ink);
+    op(rec, Math.floor((t - 0.35) / 0.6) % 2 ? 0.25 : 1);
+  };
+}
+function buildWipe() {
+  const dotsG = el('g', {}, wipe);
+  const dots = [];
+  for (let y = 0; y <= H + 80; y += 80) for (let x = 0; x <= W + 80; x += 80) dots.push({ el: el('circle', { cx: x, cy: y, r: 0 }, dotsG), x, y });
+  wipeUpdate = (t) => {
+    const w = WIPES.find(([b]) => Math.abs(t - b) < 0.22);
+    show(dotsG, !!w);
+    if (!w) return;
+    dotsG.setAttribute('fill', w[1]);
+    const u = (t - w[0] + 0.22) / 0.44;
+    dots.forEach(d => {
+      const delay = (d.x / W * 0.4 + d.y / H * 0.6) * 0.35;
+      const p = clamp((u - delay) / 0.65);
+      d.el.setAttribute('r', (Math.sin(p * Math.PI) * 62).toFixed(1));
+    });
+  };
+}
+
+// ============================================================
+// paper & grain
+// ============================================================
+function buildPaper() {
+  const cv = document.getElementById('paper'), ctx = cv.getContext('2d');
+  const r = rng(6);
+  const small = document.createElement('canvas'); small.width = 54; small.height = 96;
+  const sctx = small.getContext('2d'); const sim = sctx.createImageData(54, 96);
+  for (let i = 0; i < sim.data.length; i += 4) { const v = 242 + r() * 13; sim.data[i] = sim.data[i + 1] = sim.data[i + 2] = v; sim.data[i + 3] = 255; }
+  sctx.putImageData(sim, 0, 0);
+  ctx.imageSmoothingEnabled = true; ctx.drawImage(small, 0, 0, W, H);
+  const base = ctx.getImageData(0, 0, W, H);
+  for (let i = 0; i < base.data.length; i += 4) {
+    const n = (r() - 0.5) * 26;
+    base.data[i] = clamp(base.data[i] + n, 0, 255);
+    base.data[i + 1] = clamp(base.data[i + 1] + n, 0, 255);
+    base.data[i + 2] = clamp(base.data[i + 2] + n - 5, 0, 255);
+  }
+  ctx.putImageData(base, 0, 0);
+  const gr = ctx.createRadialGradient(540, 960, 500, 540, 960, 1250);
+  gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(120,100,80,0.35)');
+  ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(140,120,100,0.18)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(0, 960); ctx.lineTo(W, 962); ctx.stroke();
+}
+function drawFx(frame) {
+  const cv = document.getElementById('fx'), ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  const r = rng(1000 + Math.floor(frame / 2));
+  ctx.fillStyle = 'rgba(255,248,235,0.75)';
+  for (let i = 0; i < 520; i++) { ctx.beginPath(); ctx.arc(r() * W, r() * H, 0.6 + r() * 1.8, 0, 7); ctx.fill(); }
+  ctx.fillStyle = 'rgba(43,29,20,0.25)';
+  for (let i = 0; i < 90; i++) { ctx.beginPath(); ctx.arc(r() * W, r() * H, 0.6 + r() * 1.3, 0, 7); ctx.fill(); }
+}
+
+// ============================================================
+// render
+// ============================================================
+const SHAKES = [[T.classified, 16, 0.3], [T.unmapped, 10, 0.25], [T.bifrost, 9, 0.25], [T.swing, 5, 0.9], [T.cicada, 7, 0.25],
+  ...[0, 1, 2, 3, 4, 5].map(i => [T.failed + 0.3 * i, 4, 0.15]), [T.one, 10, 0.3], [T.unconvinced, 26, 0.45], [T.unsolved, 14, 0.3]];
+const FLASHES = [[T.classified, 0.5, 0.15], [T.kat, 0.8, 0.3], ...T.mug.map(m => [m, 0.8, 0.3]), [T.unconvinced, 0.5, 0.12], [T.unsolved, 0.4, 0.12]];
+const GROOVE = [[0, T.w1], [T.w3, T.w4], [T.cut6, T.empty]];
+const boilT = document.getElementById('boilT');
+function render(t) {
+  const frame = Math.round(t * FPS);
+  boilT.setAttribute('seed', 1 + (Math.floor(t * 10) % 40));
+  camZ = { s: 1, cx: 540, cy: 960 };
+  for (const s of scenes) {
+    const on = t >= s.t0 && t < s.t1;
+    show(s.g, on);
+    if (on) s.update(t);
+  }
+  let dx = 0, dy = 0;
+  for (const [t0, a, d] of SHAKES) {
+    if (t >= t0 && t < t0 + d) { const k = 1 - (t - t0) / d; dx += a * k * k * Math.sin(t * 91 + t0); dy += a * k * k * Math.cos(t * 77 + t0 * 3); }
+  }
+  const inGroove = GROOVE.some(([a, b]) => t >= a && t < b);
+  const pulse = inGroove ? 1 + 0.006 * Math.exp(-(((t - 0.35) % 0.6 + 0.6) % 0.6) / 0.07) : 1;
+  const s = camZ.s * pulse, tx = camZ.tx ?? camZ.cx, ty = camZ.ty ?? camZ.cy;
+  cam.setAttribute('transform', `translate(${(tx + dx + (camZ.dx || 0)).toFixed(2)} ${(ty + dy + (camZ.dy || 0)).toFixed(2)}) scale(${s.toFixed(4)}) translate(${(-camZ.cx).toFixed(2)} ${(-camZ.cy).toFixed(2)})`);
+  let fl = 0;
+  for (const [f, a, d] of FLASHES) if (t >= f && t < f + d) fl = Math.max(fl, a * Math.pow(1 - (t - f) / d, 2));
+  op(flash, fl);
+  op(fade, seg(t, DUR - 0.4, DUR));
+  captionsUpdate(t);
+  hudUpdate(t);
+  wipeUpdate(t);
+  drawFx(frame);
+}
+
+// texts on screen at t, for readcheck (captions are checked through the .srt)
+function TEXTS(t) {
+  render(t);
+  const out = [];
+  for (const it of TXT) {
+    if (it.part) continue;
+    if (it.when && !(t >= it.when[0] && t < it.when[1])) continue;
+    if (visible(it.node) < 0.5) continue;
+    if (it.vis && !it.vis()) continue;
+    const nodes = [it.node, ...TXT.filter(o => o.part && o.id === it.id).map(o => o.node)];
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const n of nodes) { const b = n.getBoundingClientRect(); if (!b.width) continue; x0 = Math.min(x0, b.left); y0 = Math.min(y0, b.top); x1 = Math.max(x1, b.right); y1 = Math.max(y1, b.bottom); }
+    if (x1 < x0) continue;
+    out.push({ id: it.id, text: it.text, x0, y0, x1, y1, ...(it.pass ? { pass: true } : {}) });
+  }
+  return out;
+}
+
+// sound and cue events for the mixer (exported by events.mjs)
+function buildEvents() {
+  const EV = [];
+  const add = (t, type, o = {}) => EV.push({ t: +t.toFixed(3), type, ...o });
+  add(T.classified, 'stamp', { big: 1 }); add(T.unmapped, 'stamp'); add(T.onlyTag, 'stamp', { small: 1 });
+  [0, 1, 2, 3, 4, 5].forEach(i => add(T.failed + 0.3 * i, 'stamp', { small: 1, n: i }));
+  add(T.unconvinced, 'stamp', { big: 1 }); add(T.unsolved, 'stamp', { big: 1 });
+  add(T.bifrost, 'slam'); add(T.one, 'slam');
+  for (const [c] of WIPES) add(c - 0.22, 'whoosh');
+  add(T.under, 'rumble'); add(T.mapcard, 'paper'); add(T.routes, 'pen', { d: 2.7 });
+  add(T.brick, 'click'); add(T.swing, 'grind', { d: 0.9 }); add(T.bloom, 'bloom'); add(T.w2, 'drips', { d: T.w3 - T.w2 });
+  add(T.cicada, 'thump'); add(T.netline, 'type', { n: 40, rate: 0.03 }); add(T.tilt, 'paper');
+  add(T.kat, 'shutter'); add(T.kat, 'paper'); add(T.w5 + 0.15, 'paper');
+  add(T.unredact, 'type', { n: 17, rate: 0.02 }); add(T.unredact, 'roll', { d: T.zoom - T.unredact }); add(T.zoom, 'zoom');
+  add(T.challenge, 'hit'); add(T.challenge, 'type', { n: 12, rate: 0.02 }); add(T.password, 'hit'); add(T.password, 'type', { n: 15, rate: 0.02 });
+  T.mug.forEach(m => add(m, 'shutter'));
+  add(T.bubble, 'boing');
+  add(T.answer, 'hit', { low: 1 }); add(T.answer, 'paper');
+  const pops = (t0, n, st) => { for (let i = 0; i < n; i++) if (i % 2 === 0) add(t0 + i * st, 'pop'); };
+  pops(0.6, 12, 0.045); pops(1.15, 5, 0.06); pops(T.under, 11, 0.04); pops(T.wallHead, 14, 0.035); pops(T.bloom, 9, 0.05);
+  pops(T.cicada, 6, 0.05); pops(T.infil, 13, 0.03); pops(T.report, 12, 0.035); pops(T.statements, 10, 0.035);
+  pops(T.question, 10, 0.04); pops(T.question + 0.5, 13, 0.04);
+  EV.sort((a, b) => a.t - b.t);
+  return EV;
+}
+
+async function init() {
+  const fams = ['400 50px "Alfa Slab One"', '400 50px "Bagel Fat One"', '400 50px "Archivo Black"', '800 50px "JetBrains Mono"'];
+  const sample = document.documentElement.innerHTML + 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:;.,!?\'"·-…';
+  await Promise.all(fams.map(f => document.fonts.load(f, sample)));
+  await document.fonts.ready;
+  const tl = await (await fetch('timeline.json')).json();
+  buildPaper();
+  buildAll();
+  buildCaptions(tl.lines);
+  window.EV = buildEvents();
+  const q = new URLSearchParams(location.search);
+  render(parseFloat(q.get('t') || '0'));
+  window.READY = true;
+}
+window.DUR = DUR;
+window.render = render;
+window.TEXTS = TEXTS;
+init();
+</script>
+</body>
+</html>
