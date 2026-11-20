@@ -1,0 +1,22 @@
+A Bestiary of Azul · Plate I · The Gold Wyvern — third-party material used in the film
+
+FONTS (SIL Open Font License 1.1; licence texts in fonts/LICENSE-*.txt; files from the Fontsource npm packages)
+- Bodoni Moda (500, 500 italic, 700) — Copyright The Bodoni Moda Project Authors. Roman lettering and italics.
+- Pinyon Script — Copyright The Pinyon Script Project Authors. Script notes and the subtitle slip.
+
+VOICE
+- Narration synthesized with Kokoro-82M (hexgrad, Apache License 2.0), voice "bm_george", speed 1.0, then
+  sped 5 % with ffmpeg atempo (pitch kept). Script: script.txt.
+- Speech-to-text check and word timings: faster-whisper with the Whisper "small" model (MIT License).
+
+MUSIC AND SOUND
+- Score (harpsichord, pizzicato bass, cello, glass harmonica), foley and room tone are synthesized in mix.py
+  (numpy/scipy); no samples or recordings are used. Mixing helpers from the Lemo-Opuscar library's
+  core/audio/sfx.py (MIT License).
+
+PICTURE
+- The engraving engine in engine/ (burin.js, plate.js, wash.js) is copied from the Lemo-Opuscar library's
+  Copperplate Engraving demo (MIT License). Every figure on the plate is drawn in code in figures.js and
+  film.js. Rendering, mastering and subtitle tools from the library's core/render (MIT License).
+
+The world of Azul, its creatures and the Adventurers' Guild belong to the series author.

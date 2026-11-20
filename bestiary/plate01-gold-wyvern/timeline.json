@@ -1,0 +1,235 @@
+{
+ "dur": 141.2,
+ "lines": [
+  {
+   "i": 0,
+   "t0": 0.9,
+   "t1": 5.21,
+   "text": "Unlike true dragons, wyverns are not innately magical.",
+   "src": [
+    0.0,
+    4.31
+   ]
+  },
+  {
+   "i": 1,
+   "t0": 5.81,
+   "t1": 11.405,
+   "text": "They have no mana pathways to bend physics, or conjure the elements from thin air.",
+   "src": [
+    4.786,
+    10.381
+   ]
+  },
+  {
+   "i": 2,
+   "t0": 12.005,
+   "t1": 19.72,
+   "text": "Yet high in the alpine ridges of the Wildlands, Dracunculus fulgur, the Gold Wyvern, hunts with bolts of lightning.",
+   "src": [
+    10.952,
+    18.667
+   ]
+  },
+  {
+   "i": 3,
+   "t0": 20.32,
+   "t1": 22.582,
+   "text": "It casts no spells.",
+   "src": [
+    19.238,
+    21.5
+   ]
+  },
+  {
+   "i": 4,
+   "t0": 23.182,
+   "t1": 26.468,
+   "text": "It evolved a biological power plant.",
+   "src": [
+    21.881,
+    25.167
+   ]
+  },
+  {
+   "i": 5,
+   "t0": 27.515,
+   "t1": 35.063,
+   "text": "Along its ribcage run two massive organs: the thoracic electroplaques, which hunters call Dynamo Sacs.",
+   "src": [
+    26.214,
+    33.762
+   ]
+  },
+  {
+   "i": 6,
+   "t0": 35.663,
+   "t1": 42.544,
+   "text": "They are stacked columns of muscle cells, like those of an electric eel, scaled up to apex proportions.",
+   "src": [
+    34.238,
+    41.119
+   ]
+  },
+  {
+   "i": 7,
+   "t0": 43.144,
+   "t1": 51.311,
+   "text": "Every downstroke of its twenty-eight-foot wings squeezes the sacs, and drives charged ions across thousands of cell walls.",
+   "src": [
+    41.69,
+    49.857
+   ]
+  },
+  {
+   "i": 8,
+   "t0": 51.911,
+   "t1": 54.935,
+   "text": "Flight itself charges the battery.",
+   "src": [
+    50.333,
+    53.357
+   ]
+  },
+  {
+   "i": 9,
+   "t0": 55.983,
+   "t1": 63.173,
+   "text": "To use that charge, the Gold Wyvern swallows copper ore, quartz grit, and Sylvan iron as gizzard stones.",
+   "src": [
+    54.405,
+    61.595
+   ]
+  },
+  {
+   "i": 10,
+   "t0": 63.773,
+   "t1": 71.773,
+   "text": "Its stomach acid dissolves them, and the metals harden its hollow, copper-enamel fangs, and translucent amber scales.",
+   "src": [
+    62.071,
+    70.071
+   ]
+  },
+  {
+   "i": 11,
+   "t0": 72.373,
+   "t1": 79.825,
+   "text": "When its jaws snap shut, piezoelectric crystals in the palate strike a spark, ionising the air before its snout,",
+   "src": [
+    70.643,
+    78.095
+   ]
+  },
+  {
+   "i": 12,
+   "t0": 80.425,
+   "t1": 84.02,
+   "text": "and the stored charge leaps out in a blinding arc.",
+   "src": [
+    78.381,
+    81.976
+   ]
+  },
+  {
+   "i": 13,
+   "t0": 85.068,
+   "t1": 91.973,
+   "text": "To keep from frying its own nerves, its heart and brain sit in triple sheaths of insulating fat.",
+   "src": [
+    83.024,
+    89.929
+   ]
+  },
+  {
+   "i": 14,
+   "t0": 92.573,
+   "t1": 97.525,
+   "text": "And beneath its scales live colonies of metallic-blue Static-Ticks:",
+   "src": [
+    90.5,
+    95.452
+   ]
+  },
+  {
+   "i": 15,
+   "t0": 98.125,
+   "t1": 102.958,
+   "text": "mites that feed on stray surface charge, and secrete a waterproof wax,",
+   "src": [
+    95.738,
+    100.571
+   ]
+  },
+  {
+   "i": 16,
+   "t0": 103.558,
+   "t1": 108.153,
+   "text": "so fog and storm rain never short-circuit the wyvern in flight.",
+   "src": [
+    100.857,
+    105.452
+   ]
+  },
+  {
+   "i": 17,
+   "t0": 109.201,
+   "t1": 116.868,
+   "text": "Because this lightning is biology, not magic, anti-magic wards and mage-breaking strikes do nothing against it.",
+   "src": [
+    106.5,
+    114.167
+   ]
+  },
+  {
+   "i": 18,
+   "t0": 117.468,
+   "t1": 120.492,
+   "text": "Guild survival doctrine is simple.",
+   "src": [
+    114.738,
+    117.762
+   ]
+  },
+  {
+   "i": 19,
+   "t0": 121.092,
+   "t1": 122.997,
+   "text": "Drop all steel.",
+   "src": [
+    118.238,
+    120.143
+   ]
+  },
+  {
+   "i": 20,
+   "t0": 123.597,
+   "t1": 126.859,
+   "text": "Press yourself flat against dry stone.",
+   "src": [
+    120.476,
+    123.738
+   ]
+  },
+  {
+   "i": 21,
+   "t0": 127.459,
+   "t1": 131.959,
+   "text": "Aim a wooden-shafted bolt at the uninsulated underbelly.",
+   "src": [
+    124.071,
+    128.571
+   ]
+  },
+  {
+   "i": 22,
+   "t0": 132.559,
+   "t1": 137.202,
+   "text": "Pierce a Dynamo Sac, and the beast's own charge stops its heart.",
+   "src": [
+    129.143,
+    133.786
+   ]
+  }
+ ]
+}

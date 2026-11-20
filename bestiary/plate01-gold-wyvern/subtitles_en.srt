@@ -1,0 +1,91 @@
+1
+00:00:00,800 --> 00:00:05,710
+Unlike true dragons, wyverns are not innately magical.
+
+2
+00:00:05,710 --> 00:00:11,905
+They have no mana pathways to bend physics, or conjure the elements from thin air.
+
+3
+00:00:11,905 --> 00:00:20,220
+Yet high in the alpine ridges of the Wildlands, Dracunculus fulgur, the Gold Wyvern, hunts with bolts of lightning.
+
+4
+00:00:20,220 --> 00:00:23,082
+It casts no spells.
+
+5
+00:00:23,082 --> 00:00:27,415
+It evolved a biological power plant.
+
+6
+00:00:27,415 --> 00:00:35,563
+Along its ribcage run two massive organs: the thoracic electroplaques, which hunters call Dynamo Sacs.
+
+7
+00:00:35,563 --> 00:00:43,044
+They are stacked columns of muscle cells, like those of an electric eel, scaled up to apex proportions.
+
+8
+00:00:43,044 --> 00:00:51,811
+Every downstroke of its twenty-eight-foot wings squeezes the sacs, and drives charged ions across thousands of cell walls.
+
+9
+00:00:51,811 --> 00:00:55,883
+Flight itself charges the battery.
+
+10
+00:00:55,883 --> 00:01:03,673
+To use that charge, the Gold Wyvern swallows copper ore, quartz grit, and Sylvan iron as gizzard stones.
+
+11
+00:01:03,673 --> 00:01:12,273
+Its stomach acid dissolves them, and the metals harden its hollow, copper-enamel fangs, and translucent amber scales.
+
+12
+00:01:12,273 --> 00:01:20,325
+When its jaws snap shut, piezoelectric crystals in the palate strike a spark, ionising the air before its snout,
+
+13
+00:01:20,325 --> 00:01:24,968
+and the stored charge leaps out in a blinding arc.
+
+14
+00:01:24,968 --> 00:01:32,473
+To keep from frying its own nerves, its heart and brain sit in triple sheaths of insulating fat.
+
+15
+00:01:32,473 --> 00:01:38,025
+And beneath its scales live colonies of metallic-blue Static-Ticks:
+
+16
+00:01:38,025 --> 00:01:43,458
+mites that feed on stray surface charge, and secrete a waterproof wax,
+
+17
+00:01:43,458 --> 00:01:49,101
+so fog and storm rain never short-circuit the wyvern in flight.
+
+18
+00:01:49,101 --> 00:01:57,368
+Because this lightning is biology, not magic, anti-magic wards and mage-breaking strikes do nothing against it.
+
+19
+00:01:57,368 --> 00:02:00,992
+Guild survival doctrine is simple.
+
+20
+00:02:00,992 --> 00:02:03,497
+Drop all steel.
+
+21
+00:02:03,497 --> 00:02:07,359
+Press yourself flat against dry stone.
+
+22
+00:02:07,359 --> 00:02:12,459
+Aim a wooden-shafted bolt at the uninsulated underbelly.
+
+23
+00:02:12,459 --> 00:02:17,802
+Pierce a Dynamo Sac, and the beast's own charge stops its heart.
