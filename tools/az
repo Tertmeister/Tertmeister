@@ -1,0 +1,51 @@
+#!/bin/sh
+# az: one command for the Azul production tools (details: tools/README.md).
+TOOLS=$(cd "$(dirname "$0")" && pwd)
+LIB=${LIB:-$HOME/lemo-opuscar}; export LIB
+PY="$LIB/.venv/bin/python"
+usage() {
+  cat <<'EOF'
+usage: tools/az COMMAND [args]   (each command takes -h)
+  narrate SCRIPT OUTDIR [--voice V] [--speed S] [--check]   narrate a script locally (Kokoro), with word timings
+  say "text" OUT.wav [--voice V] [--speed S]                speak one line, e.g. to audition a name
+  align AUDIO [--script SCRIPT] [--out words.json]          word timings for any recording (Parakeet)
+  place ASSETS FILM [--open S] [--gap S] [--tail S] [--pin I=T]  lay the lines on a film's timeline
+  fx IN.wav OUT.wav [--preset narrator|study|crypt]          mic'd sound for the narration (Pedalboard)
+  deliver MASTER.mp4 OUT.mp4 [--vmaf] | --check FILM.mp4     upload copy + Shorts/GitHub checks
+  tighten IN.wav WORDS.json OUT.wav OUT_WORDS.json           shorten long pauses (shorts/tighten.py)
+  lint [PATHS]                                              ruff (Python) + ShellCheck (shell) over the repo
+  doctor | selftest                                         what is installed / a 20 s end-to-end test; setup: install
+  py ...                                                    the toolchain's Python (numpy, sampler, ...)
+EOF
+}
+need() { [ -x "$PY" ] || { echo "az: $PY is missing: run  sh $TOOLS/setup_env.sh"; exit 1; }; }
+cmd=$1; [ $# -gt 0 ] && shift
+case "$cmd" in
+  narrate) need; exec "$PY" -I "$TOOLS/narrate.py" "$@" ;;
+  say)     need; [ $# -ge 2 ] || { echo 'usage: tools/az say "text" OUT.wav [--voice V] [--speed S]'; exit 2; }
+           t=$1; o=$2; shift 2; exec "$PY" -I "$TOOLS/narrate.py" "$t" "$o" --say "$@" ;;
+  align)   need; exec "$PY" -I "$TOOLS/align.py" "$@" ;;
+  place)   need; exec "$PY" -I "$TOOLS/place.py" "$@" ;;
+  fx)      need; exec "$PY" -I "$TOOLS/voicefx.py" "$@" ;;
+  deliver) need; exec "$PY" -I "$TOOLS/deliver.py" "$@" ;;
+  tighten) need; exec "$PY" -I "$TOOLS/../shorts/tighten.py" "$@" ;;
+  lint)    need; V=$(dirname "$PY"); ROOT=$(cd "$TOOLS/.." && pwd); [ $# -gt 0 ] || set -- "$ROOT"
+           [ -x "$V/ruff" ] && [ -x "$V/shellcheck" ] || { echo "az: ruff/shellcheck missing: run sh $TOOLS/setup_env.sh"; exit 1; }
+           "$V/ruff" check --config "$ROOT/ruff.toml" "$@"; r=$?
+           find "$@" -name '*.sh' -not -path '*/node_modules/*' -not -path '*/out/*' -exec "$V/shellcheck" -s sh -S warning {} +
+           s=$?; [ $r -eq 0 ] && [ $s -eq 0 ] && echo "lint: clean"; exit $((r + s)) ;;
+  selftest) need; T=$(mktemp -d); trap 'rm -rf "$T"' EXIT; printf '# tool test\nThe tools are working.\nThis line checks the timing.\n' > "$T/s.txt"
+           "$PY" -I "$TOOLS/narrate.py" "$T/s.txt" "$T/a" --voice bm_george >"$T/log" 2>&1 && echo "✓ narrate" &&
+           "$PY" -I "$TOOLS/place.py" "$T/a" "$T/f" >>"$T/log" 2>&1 && echo "✓ place" &&
+           "$PY" -I "$TOOLS/voicefx.py" "$T/a/narration.wav" "$T/fx.wav" --preset study >>"$T/log" 2>&1 && echo "✓ fx" &&
+           "$PY" -I "$TOOLS/align.py" "$T/a/narration.wav" --script "$T/s.txt" --out "$T/w.json" >>"$T/log" 2>&1 && echo "✓ align" &&
+           ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc2=s=1080x1920:r=24:d=2 -i "$T/f/out/voice.wav" -t 2 -c:v libx264 -c:a aac -ar 48000 -movflags +faststart "$T/v.mp4" &&
+           "$PY" -I "$TOOLS/deliver.py" --check "$T/v.mp4" >>"$T/log" 2>&1; r=$?
+           grep -E "speech check|matches|difference" "$T/log"; [ $r -le 1 ] && echo "✓ deliver --check runs" && echo "selftest: ok" && exit 0
+           cat "$T/log"; echo "selftest: FAILED"; exit 1 ;;
+  doctor)  exec sh "$TOOLS/setup_env.sh" --check ;;
+  setup)   exec sh "$TOOLS/setup_env.sh" "$@" ;;
+  py)      need; exec "$PY" "$@" ;;
+  ""|-h|--help|help) usage ;;
+  *) echo "az: unknown command '$cmd'"; usage; exit 2 ;;
+esac

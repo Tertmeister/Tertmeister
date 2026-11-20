@@ -215,7 +215,7 @@ for f in range(NF):
             if abs(s - 1) > 1e-3:
                 ci_img = ci_img.resize((int(ci_img.width * s), int(ci_img.height * s)), Image.BILINEAR)
             if alpha < 1:
-                ci_img = ci_img.copy(); a_ = ci_img.getchannel("A").point(lambda v: int(v * alpha)); ci_img.putalpha(a_)
+                ci_img = ci_img.copy(); a_ = ci_img.getchannel("A").point(lambda v: int(v * alpha)); ci_img.putalpha(a_)  # noqa: B023 (used at once)
             img.alpha_composite(ci_img, ((W - ci_img.width) // 2, 1180 - ci_img.height // 2))
             break
 

@@ -31,6 +31,11 @@ Two series share one world (the continent of Azul):
 - Narration: clinical, academic nature-documentary tone; Kokoro `bm_george`.
 - Colour only as transparent wash on the part being taught; the finished plate is the last shot.
 
+## Toolchain (both series)
+Free, offline tools in `tools/` (see `tools/README.md`): `tools/az narrate | say | align | place | fx | deliver | lint | doctor | selftest`.
+`sh tools/setup_env.sh` installs anything missing (`--check` reports). Local narration costs no credits, but rule 1
+still applies: narrate only an approved script (`az narrate … --check` shows pronunciations without making audio).
+
 ## Spellings (both series)
 Azul, Ambershire, Nightingale's palace, Aquarion, the Great Oak, the Royal Archives, Lady Jane, the Black
 Witch, the Witch of Hope, the Paladins of Parabellum, the Adventurers' Guild, the Bifrost, Cicada, Agent Kat,

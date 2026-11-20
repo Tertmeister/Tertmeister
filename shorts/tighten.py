@@ -22,7 +22,7 @@ with wave.open(src, "rb") as f:
 
 words = json.load(open(wsrc))
 cuts = []  # (start_s, length_s)
-for (s0, e0, _), (s1, e1, _) in zip(words, words[1:]):
+for (_s0, e0, _), (s1, _e1, _) in zip(words, words[1:]):
     gap = s1 - e0
     if gap > MIN_GAP:
         keep = MIN_GAP + (gap - MIN_GAP) * KEEP

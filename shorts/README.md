@@ -3,14 +3,16 @@
 Each episode folder holds `short.mp4` (1080x1920, ready to upload), the script, word timings and a `config.json`.
 
 ## Making an episode
-1. Narration: your own audio, or Kokoro TTS (free, Apache-2.0), voice `am_michael`, speed 1.0.
-   Check made-up names with Kokoro's `g2p` first: unknown words must get phonemes or they are skipped.
-2. Word timings: faster-whisper with `word_timestamps=True` -> `words.json`. Correct any misheard words
-   against the script (the captions use this text).
+1. Narration: your own audio, or Kokoro TTS (free, Apache-2.0), voice `am_michael`, speed 1.0, now run locally:
+   `tools/az narrate script.txt <episode>/assets --voice am_michael` (see `tools/README.md`). Check made-up names
+   first with `--check` (no audio): it lists how every word outside the dictionary will be said.
+2. Word timings: `az narrate` writes `words.json` itself. For your own recording:
+   `tools/az align audio.mp3 --script script.txt --out words.json` (Parakeet), confirm the transcript it prints;
+   the output uses the script's spelling (the captions use this text).
 3. Too long? `python3 tighten.py narration.wav words.json tight.wav words_tight.json` shortens only the
    long pauses (speech untouched) and shifts the timings to match.
 4. Mix: voice + `drone.py` music bed at -21 dB, light reverb, loudnorm -14 LUFS.
-5. Render: `python3 render.py mix.wav words.json short.mp4 config.json`
+5. Render: `python3 render.py mix.wav words.json short.mp4 config.json`, then check it: `tools/az deliver --check short.mp4`
 
 ## `config.json`
 - `episode`: subtitle under the series title.
